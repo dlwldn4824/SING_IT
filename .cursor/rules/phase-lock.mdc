@@ -1,0 +1,15 @@
+---
+description: Follow GAME_SPEC.md one phase at a time. Never generate the whole game.
+alwaysApply: true
+---
+
+# Phase lock
+
+Read `GAME_SPEC.md` first. Implement only the Current Phase.
+
+- Do not generate the whole game in one pass
+- Do not start the next phase until the user confirms the current one works
+- After a phase, report the 8-item checklist from GAME_SPEC.md
+- Fastest meaningful target is Phase 7 (cable disconnect vertical slice)
+- No extra accidents, maps, co-op, or juice-as-logic before their phase
+- Keep ART_GUIDE.md. No new colors, no warning-text accidents, no glow/outline

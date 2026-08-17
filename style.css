@@ -1,0 +1,30 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0e0b12;
+  color: #f4f0e8;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: #1a1520;
+  display: block;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #9a9692;
+}
