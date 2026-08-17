@@ -4,9 +4,9 @@
 > 한 번에 전체 게임을 생성하지 않는다.
 > 사용자가 해당 Phase의 정상 작동을 확인하기 전에는 다음 Phase 코드를 작성하지 않는다.
 
-**Current Phase:** `1 — PROJECT FOUNDATION`  
-**Status:** 분석 완료. 구현은 사용자 확인 후 시작.  
-**Vertical Slice 목표:** Phase 7 (케이블 사고)까지 가능한 한 빨리 도달한다.
+**Current Phase:** Unity `1 — PROJECT FOUNDATION` (대기)  
+**Current Pass:** `PASS 1` A–E 적용됨. 플레이테스트 대기.  
+**다음:** 확인 후 `PASS 2 — COLOR SYSTEM`. 승인 없이 시작하지 않음.
 
 ---
 

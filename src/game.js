@@ -1,6 +1,7 @@
 import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
 import { axis, tap, held } from "./input.js";
+import { VENUES } from "./venues.js";
 
 const SHOW = 180;
 const CHAR = { w: 16, h: 24 };
@@ -12,9 +13,6 @@ const FRAMES = {
   panic: [11, 12],
 };
 const WHO = { p1: 0, p2: 1, vocal: 2, guitar: 3, drum: 4 };
-
-const STAGE = { x: 24, y: 52, w: 272, h: 84 };
-const BACK = { y: 136 };
 
 function aabb(x, y, w, h) {
   return { x, y, w, h };
@@ -42,23 +40,38 @@ function feetBox(e) {
   return aabb(e.x + 3, e.y + 16, 10, 8);
 }
 
+function carryOffset(pl) {
+  const tall = pl.carrying && (pl.carrying.kind === "spareGuitar" || pl.carrying.kind === "guitar" || pl.carrying.kind === "mic");
+  if (pl.dir === "left") return { x: tall ? -10 : -8, y: tall ? 6 : 10 };
+  if (pl.dir === "right") return { x: 12, y: tall ? 6 : 10 };
+  if (pl.dir === "up") return { x: 10, y: tall ? 2 : 6 };
+  return { x: 10, y: tall ? 8 : 12 };
+}
+
 export function createGame(assets, camera, juice, audio) {
   const { chars, tiles, props, fx, crowd } = assets;
 
-  const solids = [
-    aabb(148, 118, 16, 12),
-    aabb(208, 118, 16, 12),
-    aabb(214, 92, 28, 16),
-    aabb(248, 156, 16, 14),
-    aabb(0, 0, 320, 52),
-  ];
-
+  const solids = [];
   const stations = {
     guitar: { x: 148, y: 78, w: 16, h: 24 },
     amp: { x: 148, y: 108, w: 16, h: 16 },
+    amp2: { x: 208, y: 108, w: 16, h: 16 },
     drum: { x: 214, y: 80, w: 32, h: 24 },
     micHome: { x: 86, y: 70, w: 16, h: 24 },
   };
+  let venueIndex = 0;
+  const venue = () => VENUES[venueIndex];
+
+  function applyLayout() {
+    const v = venue();
+    solids.length = 0;
+    for (const s of v.solids) solids.push(aabb(s.x, s.y, s.w, s.h));
+    Object.assign(stations.guitar, v.stations.guitar);
+    Object.assign(stations.amp, v.stations.amp);
+    Object.assign(stations.amp2, v.stations.amp2);
+    Object.assign(stations.drum, v.stations.drum);
+    Object.assign(stations.micHome, v.stations.micHome);
+  }
 
   function makePlayer(id, x, y, who) {
     return {
@@ -75,33 +88,31 @@ export function createGame(assets, camera, juice, audio) {
   let state;
 
   function reset() {
+    applyLayout();
+    const v = venue();
     state = {
       phase: "title",
-      time: SHOW,
+      time: v.duration,
       tension: 82,
       song: 0,
-      players: [makePlayer("p1", 150, 148, "p1"), makePlayer("p2", 176, 148, "p2")],
-      npcs: [
-        { who: "vocal", x: 78, y: 78, dir: "down", panic: false, t: 0 },
-        { who: "guitar", x: 164, y: 76, dir: "down", panic: false, t: 0 },
-        { who: "drum", x: 226, y: 72, dir: "down", panic: false, t: 0 },
+      players: [
+        makePlayer("p1", v.players[0].x, v.players[0].y, "p1"),
+        makePlayer("p2", v.players[1].x, v.players[1].y, "p2"),
       ],
-      pickups: [
-        makePickup("spareGuitar", 36, 148),
-        makePickup("mic", 86, 70),
-        makePickup("box", 250, 148),
-      ],
+      npcs: v.npcs.map((n) => ({ who: n.who, x: n.x, y: n.y, dir: "down", panic: false, t: 0 })),
+      pickups: v.pickups.map((p) => makePickup(p.kind, p.x, p.y)),
       accidents: {
         cable: { on: false, ttl: 0 },
         string: { on: false, ttl: 0 },
         stick: { on: false, ttl: 0 },
         feedback: { on: false, ttl: 0 },
       },
-      nextSpawn: 6,
+      nextSpawn: v.firstSpawn,
       spawnIndex: 0,
       pop: [],
       wave: 0,
       hold: null,
+      tutorial: { on: !!v.tutorial, step: "move", t: 0, dist: 0 },
     };
   }
 
@@ -121,18 +132,21 @@ export function createGame(assets, camera, juice, audio) {
     juice.spark(160, 90);
     camera.shake(1, 0.16);
     audio.blip("danger");
+    if (kind === "cable" || kind === "string") audio.setStem("guitar", false);
+    if (kind === "stick") audio.setStem("drums", false);
+    if (kind === "feedback") audio.setStem("vocals", false);
 
     if (kind === "cable") {
       const existing = state.pickups.find((p) => p.kind === "cable");
-      if (!existing) state.pickups.push(makePickup("cable", 156, 102));
+      if (!existing) state.pickups.push(makePickup("cable", 80, 154));
       else if (!existing.heldBy) {
-        existing.x = 156;
-        existing.y = 102;
+        existing.x = 80;
+        existing.y = 154;
       }
     }
     if (kind === "stick") {
-      const sx = 40 + Math.random() * 240;
-      const sy = 60 + Math.random() * 70;
+      const sx = state.tutorial.on ? 168 : 40 + Math.random() * 240;
+      const sy = state.tutorial.on ? 122 : 60 + Math.random() * 70;
       const existing = state.pickups.find((p) => p.kind === "stick");
       if (!existing) state.pickups.push(makePickup("stick", sx, sy));
       else if (!existing.heldBy) {
@@ -153,9 +167,10 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function accidentPos(kind) {
-    if (kind === "cable" || kind === "string") return { x: 156, y: 86 };
-    if (kind === "stick") return { x: 226, y: 86 };
-    return { x: 94, y: 78 };
+    if (kind === "cable") return { x: stations.amp.x + 4, y: stations.amp.y - 8 };
+    if (kind === "string") return { x: state.npcs[1].x + 4, y: state.npcs[1].y - 10 };
+    if (kind === "stick") return { x: state.npcs[2].x + 4, y: state.npcs[2].y - 10 };
+    return { x: state.npcs[0].x + 4, y: state.npcs[0].y - 10 };
   }
 
   function clearAccident(kind, perfect) {
@@ -178,12 +193,12 @@ export function createGame(assets, camera, juice, audio) {
     const cx = f.x + f.w / 2;
     const cy = f.y + f.h / 2;
     let best = null;
-    let bestD = 16;
+    let bestD = 24;
 
     for (const p of state.pickups) {
       if (p.heldBy) continue;
       if (p.kind === "box") continue;
-      const d = dist(cx, cy, p.x + 8, p.y + 12);
+      const d = dist(cx, cy, p.x + 8, p.y + 6);
       if (d < bestD) {
         bestD = d;
         best = { type: "pickup", item: p };
@@ -191,23 +206,31 @@ export function createGame(assets, camera, juice, audio) {
     }
 
     if (player.carrying) {
+      const reach = 28;
       const ampD = dist(cx, cy, stations.amp.x + 8, stations.amp.y + 8);
-      if (player.carrying.kind === "cable" && ampD < 18) {
-        return { type: "plug" };
-      }
-      const gD = dist(cx, cy, stations.guitar.x + 8, stations.guitar.y + 12);
-      if (player.carrying.kind === "spareGuitar" && gD < 18) {
-        return { type: "swap" };
-      }
-      const dD = dist(cx, cy, stations.drum.x + 16, stations.drum.y + 12);
-      if (player.carrying.kind === "stick" && dD < 20) {
-        return { type: "giveStick" };
-      }
+      if (player.carrying.kind === "cable" && ampD < reach) return { type: "plug" };
+      const gD = Math.min(
+        dist(cx, cy, stations.guitar.x + 8, stations.guitar.y + 12),
+        dist(cx, cy, state.npcs[1].x + 8, state.npcs[1].y + 16),
+      );
+      if (player.carrying.kind === "spareGuitar" && gD < reach) return { type: "swap" };
+      const dD = Math.min(
+        dist(cx, cy, stations.drum.x + 16, stations.drum.y + 12),
+        dist(cx, cy, state.npcs[2].x + 8, state.npcs[2].y + 16),
+      );
+      if (player.carrying.kind === "stick" && dD < reach) return { type: "giveStick" };
     }
     return best;
   }
 
   function tryUse(player) {
+    if (player.carrying && player.carrying.kind === "mic" && state.accidents.feedback.on) {
+      const hitMic = nearestInteract(player);
+      if (!hitMic || hitMic.type !== "pickup") {
+        drop(player, 0, 0);
+        return;
+      }
+    }
     const hit = nearestInteract(player);
     if (!hit) return;
     if (hit.type === "pickup") {
@@ -229,7 +252,16 @@ export function createGame(assets, camera, juice, audio) {
       return;
     }
     if (hit.type === "swap" && state.accidents.string.on) {
-      state.hold = { player: player.id, kind: "swap", t: 0 };
+      const g = player.carrying;
+      player.carrying = null;
+      if (g) {
+        g.heldBy = null;
+        const home = venue().pickups.find((p) => p.kind === "spareGuitar");
+        g.x = home.x;
+        g.y = home.y;
+      }
+      state.hold = null;
+      clearAccident("string", true);
       player.act = 0.2;
       return;
     }
@@ -258,7 +290,7 @@ export function createGame(assets, camera, juice, audio) {
 
   function checkMicPlacement(mic) {
     const dAmp = dist(mic.x + 8, mic.y + 12, stations.amp.x + 8, stations.amp.y + 8);
-    const dAmp2 = dist(mic.x + 8, mic.y + 12, 216, 116);
+    const dAmp2 = dist(mic.x + 8, mic.y + 12, stations.amp2.x + 8, stations.amp2.y + 8);
     const close = Math.min(dAmp, dAmp2) < 28;
     if (close) {
       if (!state.accidents.feedback.on) spawnAccident("feedback");
@@ -325,8 +357,9 @@ export function createGame(assets, camera, juice, audio) {
     player.frame = seq[Math.floor(player.t) % seq.length];
 
     if (player.carrying) {
-      player.carrying.x = player.x;
-      player.carrying.y = player.y - 12;
+      const c = carryOffset(player);
+      player.carrying.x = player.x + c.x;
+      player.carrying.y = player.y + c.y;
     }
 
     const cable = pickupAt("cable");
@@ -416,8 +449,10 @@ export function createGame(assets, camera, juice, audio) {
     if (drain === 0) state.tension = clamp(state.tension + 1.15 * dt, 0, 100);
     else state.tension = clamp(state.tension - drain * dt, 0, 100);
 
-    state.nextSpawn -= dt;
-    if (state.nextSpawn <= 0) {
+    if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+
+    if (!state.tutorial.on) state.nextSpawn -= dt;
+    if (!state.tutorial.on && state.nextSpawn <= 0) {
       const ordered = spawnOrder[state.spawnIndex];
       if (state.spawnIndex < spawnOrder.length) {
         spawnAccident(ordered);
@@ -426,19 +461,139 @@ export function createGame(assets, camera, juice, audio) {
         const pool = names.filter((k) => !state.accidents[k].on);
         if (pool.length) spawnAccident(pool[Math.floor(Math.random() * pool.length)]);
       }
-      const panic = 1 - state.tension / 100;
-      state.nextSpawn = 11 - panic * 5 + Math.random() * 3;
+      const gap = venue().spawnGap;
+      state.nextSpawn = gap[0] + Math.random() * (gap[1] - gap[0]);
     }
 
     for (const p of state.pop) p.t -= dt;
     state.pop = state.pop.filter((p) => p.t > -1.2);
   }
 
+  function setTutorial(step) {
+    state.tutorial.step = step;
+    state.tutorial.t = 0;
+  }
+
+  function finishTutorial() {
+    state.tutorial.on = false;
+    state.tutorial.step = "done";
+    state.nextSpawn = 14;
+    state.spawnIndex = 4;
+  }
+
+  function skipTutorial() {
+    state.tutorial.on = false;
+    state.tutorial.step = "done";
+    state.nextSpawn = 6;
+    state.spawnIndex = 0;
+  }
+
+  function anyoneCarrying(kind) {
+    return state.players.some((p) => p.carrying && p.carrying.kind === kind);
+  }
+
+  function updateTutorial(dt) {
+    if (!state.tutorial.on) return;
+    state.tutorial.t += dt;
+    if (tap("start") && state.tutorial.t > 0.5) {
+      skipTutorial();
+      return;
+    }
+    const step = state.tutorial.step;
+    if (step === "move") {
+      const a = axis("p1");
+      if (a.x || a.y) state.tutorial.dist += 70 * dt;
+      if (state.tutorial.dist > 14) setTutorial("cableShow");
+    } else if (step === "cableShow") {
+      if (!state.accidents.cable.on) spawnAccident("cable");
+      if (state.tutorial.t > 1.0) setTutorial("cableGet");
+    } else if (step === "cableGet") {
+      if (anyoneCarrying("cable")) setTutorial("cableFix");
+    } else if (step === "cableFix") {
+      if (!state.accidents.cable.on) setTutorial("stringShow");
+    } else if (step === "stringShow") {
+      if (state.tutorial.t > 0.7 && !state.accidents.string.on) spawnAccident("string");
+      if (state.accidents.string.on && state.tutorial.t > 1.1) setTutorial("stringGet");
+    } else if (step === "stringGet") {
+      if (anyoneCarrying("spareGuitar")) setTutorial("stringFix");
+    } else if (step === "stringFix") {
+      if (!state.accidents.string.on) setTutorial("stickShow");
+    } else if (step === "stickShow") {
+      if (state.tutorial.t > 0.7 && !state.accidents.stick.on) spawnAccident("stick");
+      if (state.accidents.stick.on && state.tutorial.t > 1.1) setTutorial("stickGet");
+    } else if (step === "stickGet") {
+      if (anyoneCarrying("stick")) setTutorial("stickFix");
+    } else if (step === "stickFix") {
+      if (!state.accidents.stick.on) setTutorial("feedShow");
+    } else if (step === "feedShow") {
+      if (state.tutorial.t > 0.7 && !state.accidents.feedback.on) spawnAccident("feedback");
+      if (state.accidents.feedback.on && state.tutorial.t > 1.1) setTutorial("feedGet");
+    } else if (step === "feedGet") {
+      if (anyoneCarrying("mic")) setTutorial("feedPlace");
+    } else if (step === "feedPlace") {
+      if (!state.accidents.feedback.on) setTutorial("cheer");
+    } else if (step === "cheer" && state.tutorial.t > 1.4) {
+      finishTutorial();
+    }
+  }
+
+  function tutorialTarget() {
+    if (!state.tutorial.on) return null;
+    const step = state.tutorial.step;
+    if (step === "cableShow" || step === "cableFix") {
+      return { x: stations.amp.x + 8, y: stations.amp.y - 10 };
+    }
+    if (step === "cableGet") {
+      const c = pickupAt("cable");
+      if (c) return { x: c.x + 8, y: c.y - 8 };
+    }
+    if (step === "stringShow" || step === "stringFix") {
+      return { x: state.npcs[1].x + 8, y: state.npcs[1].y - 12 };
+    }
+    if (step === "stringGet") {
+      const g = pickupAt("spareGuitar");
+      if (g) return { x: g.x + 8, y: g.y - 8 };
+    }
+    if (step === "stickShow" || step === "stickFix") {
+      return { x: state.npcs[2].x + 8, y: state.npcs[2].y - 12 };
+    }
+    if (step === "stickGet") {
+      const s = pickupAt("stick");
+      if (s) return { x: s.x + 8, y: s.y - 8 };
+    }
+    if (step === "feedShow" || step === "feedGet") {
+      const m = pickupAt("mic") || state.pickups.find((p) => p.kind === "mic");
+      if (m && !m.heldBy) return { x: m.x + 8, y: m.y - 10 };
+    }
+    if (step === "feedPlace") return { x: venue().safePad.x + 8, y: venue().safePad.y - 8 };
+    return null;
+  }
+
   function update(dt) {
     audio.tick();
     if (tap("mute")) audio.toggleMute();
     if (state.phase === "title") {
+      if (tap("p1l") || tap("p2l")) {
+        venueIndex = (venueIndex + VENUES.length - 1) % VENUES.length;
+        reset();
+        state.phase = "title";
+      }
+      if (tap("p1r") || tap("p2r")) {
+        venueIndex = (venueIndex + 1) % VENUES.length;
+        reset();
+        state.phase = "title";
+      }
       if (tap("start") || tap("p1use")) {
+        reset();
+        state.phase = "play";
+        audio.start();
+      }
+      return;
+    }
+    if (state.phase === "win") {
+      if (tap("restart") || tap("start") || tap("p1use")) {
+        if (venueIndex < VENUES.length - 1) venueIndex += 1;
+        else venueIndex = 0;
         reset();
         state.phase = "play";
         audio.start();
@@ -461,8 +616,9 @@ export function createGame(assets, camera, juice, audio) {
     updatePlayer(state.players[1], "p2", dt);
     updatePickups(dt);
     updateAccidents(dt);
+    updateTutorial(dt);
 
-    state.time -= dt;
+    if (!state.tutorial.on) state.time -= dt;
     if (state.tension <= 0) {
       state.phase = "lose";
       audio.stop();
@@ -489,6 +645,11 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function playerNearPickup(p) {
+    const s = state.tutorial.on ? state.tutorial.step : "";
+    if (s === "cableGet" && p.kind === "cable") return true;
+    if (s === "stringGet" && p.kind === "spareGuitar") return true;
+    if (s === "stickGet" && p.kind === "stick") return true;
+    if (s === "feedGet" && p.kind === "mic") return true;
     for (const pl of state.players) {
       if (nearestInteract(pl)?.item === p) return true;
     }
@@ -501,52 +662,120 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawWorld(ctx) {
+    const v = venue();
+    const STAGE = v.stage;
+    const BACK = { y: v.backY };
     fill(ctx, "BG_NIGHT", 0, 0, W, H);
-    for (let x = 0; x < W; x += 16) {
-      ctx.drawImage(tiles, 64, 0, 16, 16, x, 16, 16, 16);
-      ctx.drawImage(tiles, 64, 0, 16, 16, x, 32, 16, 16);
-      ctx.drawImage(tiles, 80, 0, 16, 16, x, 40, 16, 16);
+
+    if (v.id === "club") {
+      for (let y = 0; y < 52; y += 4) {
+        for (let x = 0; x < W; x += 8) {
+          fill(ctx, (x + y) % 16 === 0 ? "BG_RAIL" : "METAL_DK", x, y, 8, 4);
+        }
+      }
+    } else if (v.id === "fest") {
+      fill(ctx, "BG_NIGHT", 0, 0, W, 52);
+      for (const s of [[24, 8], [80, 4], [140, 10], [200, 6], [260, 9], [300, 5]]) {
+        fill(ctx, "SPARK_YEL", s[0], s[1], 1, 1);
+      }
+    } else if (v.id === "arena") {
+      fill(ctx, "BG_SHADOW", 0, 0, W, 52);
+      for (let i = 0; i < 36; i += 1) {
+        fill(ctx, "PEDAL_BLUE", 86 + i, 6 + i, 1, 1);
+        fill(ctx, "TENSION_PINK", 230 - i, 6 + i, 1, 1);
+      }
+    } else {
+      for (let x = 0; x < W; x += 16) {
+        ctx.drawImage(tiles, 64, 0, 16, 16, x, 16, 16, 16);
+        ctx.drawImage(tiles, 64, 0, 16, 16, x, 32, 16, 16);
+        ctx.drawImage(tiles, 80, 0, 16, 16, x, 40, 16, 16);
+      }
     }
-    fill(ctx, "BG_AUDIENCE", 0, 0, W, 20);
+    fill(ctx, "BG_AUDIENCE", 0, 0, W, v.id === "arena" ? 16 : 18);
+
+    if (v.id === "arena") {
+      fill(ctx, "TENSION_PINK", 20, 46, 280, 2);
+      fill(ctx, "DANGER_ORANGE", 24, 48, 272, 1);
+    } else if (v.id !== "club") {
+      for (let x = 0; x < W; x += 16) ctx.drawImage(tiles, 80, 0, 16, 16, x, 40, 16, 16);
+    }
 
     const mood = state.accidents.feedback.on ? 3 : state.tension > 70 ? 0 : state.tension > 35 ? 1 : 2;
     const jump = state.phase === "play" && state.tension > 70 && Math.floor(performance.now() / 250) % 2 === 0 ? -1 : 0;
-    for (let i = 0; i < 22; i += 1) {
-      const m = state.accidents.feedback.on ? 3 : (i % 3 === 0 ? mood : Math.min(2, mood + (i % 2)));
-      const x = 16 + i * 13;
-      const y = 26 + (i % 2) + jump;
-      ctx.drawImage(crowd, m * 8, 0, 8, 12, x, y, 8, 12);
-      if (state.tension > 55 && i % 2 === 0) {
-        fill(ctx, "TENSION_PINK", x + 3, y - 4, 1, 3);
+    const rows = v.crowdRows;
+    for (let row = 0; row < rows; row += 1) {
+      for (let i = 0; i < v.crowd; i += 1) {
+        const m = state.accidents.feedback.on ? 3 : (i % 3 === 0 ? mood : Math.min(2, mood + (i % 2)));
+        const x = v.id === "club" ? 100 + i * 14 : 8 + i * Math.floor(300 / Math.max(v.crowd, 1));
+        const y = (v.id === "fest" ? 18 : 26) + row * 10 + (i % 2) + jump;
+        if (y < 46) ctx.drawImage(crowd, m * 8, 0, 8, 12, x, y, 8, 12);
+        if (state.tension > 55 && i % 2 === 0) {
+          fill(ctx, v.id === "fest" ? "SUCCESS_GOLD" : "TENSION_PINK", x + 3, y - 4, 1, 3);
+        }
       }
     }
 
-    for (let y = STAGE.y; y < BACK.y; y += 16) {
-      for (let x = STAGE.x; x < STAGE.x + STAGE.w; x += 16) {
-        const sx = ((x + y) / 16) % 2 === 0 ? 0 : 16;
-        ctx.drawImage(tiles, sx, 0, 16, 16, x, y, 16, 16);
+    if (v.id === "club") {
+      fill(ctx, "STAGE_WOOD_DK", STAGE.x - 8, STAGE.y, STAGE.w + 16, STAGE.h);
+      fill(ctx, "PEDAL_BLUE", STAGE.x, STAGE.y + 4, STAGE.w, STAGE.h - 10);
+      fill(ctx, "METAL", STAGE.x + 2, STAGE.y + 6, STAGE.w - 4, 1);
+      fill(ctx, "STAGE_WOOD", 4, 108, 28, 16);
+      fill(ctx, "PEDAL_BLUE", 8, 106, 10, 6);
+      fill(ctx, "MIC_SILVER", 40, 88, 6, 14);
+      fill(ctx, "WHITE", 42, 86, 2, 3);
+    } else if (v.id === "fest") {
+      for (let y = STAGE.y; y < BACK.y; y += 8) {
+        for (let x = STAGE.x; x < STAGE.x + STAGE.w; x += 8) {
+          fill(ctx, (x + y) % 16 === 0 ? "GUITAR_RED" : "DANGER_RED", x, y, 8, 8);
+        }
+      }
+      fill(ctx, "TENSION_PINK", 40, 54, 2, 12);
+      fill(ctx, "SUCCESS_GOLD", 160, 54, 2, 10);
+      fill(ctx, "PEDAL_BLUE", 260, 54, 2, 12);
+    } else if (v.id === "arena") {
+      fill(ctx, "METAL_DK", STAGE.x, STAGE.y, STAGE.w, STAGE.h);
+      for (let y = STAGE.y; y < BACK.y; y += 16) {
+        for (let x = STAGE.x; x < STAGE.x + STAGE.w; x += 16) {
+          if ((x + y) % 32 === 0) fill(ctx, "METAL", x, y, 16, 1);
+        }
+      }
+      fill(ctx, "METAL", 8, 58, 28, 48);
+      fill(ctx, "METAL_DK", 12, 62, 20, 16);
+      fill(ctx, "METAL", 284, 58, 28, 48);
+      fill(ctx, "METAL_DK", 288, 62, 20, 16);
+    } else {
+      for (let y = STAGE.y; y < BACK.y; y += 16) {
+        for (let x = STAGE.x; x < STAGE.x + STAGE.w; x += 16) {
+          const sx = ((x + y) / 16) % 2 === 0 ? 0 : 16;
+          ctx.drawImage(tiles, sx, 0, 16, 16, x, y, 16, 16);
+        }
       }
     }
+
     for (let y = BACK.y; y < H; y += 16) {
       for (let x = 0; x < W; x += 16) {
         ctx.drawImage(tiles, 48, 0, 16, 16, x, y, 16, 16);
       }
     }
+    fill(ctx, v.id === "fest" ? "GUITAR_RED" : "STAGE_WOOD_LT", STAGE.x, BACK.y - 1, STAGE.w, 1);
+    fill(ctx, "BG_SHADOW", 0, BACK.y, W, 1);
+    if (state.tutorial.on && state.tutorial.step === "feedPlace") {
+      fill(ctx, "MIC_SILVER", v.safePad.x, v.safePad.y, 16, 4);
+      fill(ctx, "WHITE", v.safePad.x + 2, v.safePad.y + 1, 12, 2);
+    }
 
-    ctx.drawImage(props, 144, 16, 14, 8, 176, 118, 14, 8);
+    ctx.drawImage(props, 144, 16, 14, 8, stations.amp.x + 28, stations.amp.y + 10, 14, 8);
     ctx.drawImage(props, 32, 8, 16, 16, stations.amp.x, stations.amp.y, 16, 16);
-    ctx.drawImage(props, 32, 8, 16, 16, 208, 108, 16, 16);
+    ctx.drawImage(props, 32, 8, 16, 16, stations.amp2.x, stations.amp2.y, 16, 16);
     ctx.drawImage(props, 64, 0, 32, 24, stations.drum.x, stations.drum.y, 32, 24);
-    ctx.drawImage(props, 128, 8, 16, 16, 250, 148, 16, 16);
-
+    const box = v.pickups.find((p) => p.kind === "box");
+    if (box) ctx.drawImage(props, 128, 8, 16, 16, box.x, box.y, 16, 16);
     ctx.drawImage(props, 0, 0, 16, 24, stations.guitar.x, stations.guitar.y, 16, 24);
 
     if (state.accidents.feedback.on) {
       const o = Math.round(Math.sin(state.wave) * 1);
-      ctx.globalAlpha = 0.35;
-      fill(ctx, "MIC_SILVER", 0, 90 + o, W, 1);
-      fill(ctx, "WHITE", 0, 110 - o, W, 1);
-      ctx.globalAlpha = 1;
+      fill(ctx, "MIC_SILVER", stations.micHome.x - 8, stations.micHome.y + 20 + o, 32, 1);
+      fill(ctx, "WHITE", stations.micHome.x - 8, stations.micHome.y + 24 - o, 32, 1);
     }
   }
 
@@ -572,7 +801,10 @@ export function createGame(assets, camera, juice, audio) {
         z: pl.y,
         draw: () => {
           drawChar(ctx, pl.who, pl.dir, pl.frame, pl.x, pl.y, pl.squash);
-          if (pl.carrying) drawProp(ctx, pl.carrying.kind, pl.x, pl.y - 14);
+          if (pl.carrying) {
+            const c = carryOffset(pl);
+            drawCarried(ctx, pl.carrying.kind, pl.x + c.x, pl.y + c.y, pl.dir);
+          }
           if (pl.stun > 0) ctx.drawImage(fx, 58, 2, 2, 4, Math.round(pl.x + 12), Math.round(pl.y + 2), 2, 4);
         },
       });
@@ -593,6 +825,32 @@ export function createGame(assets, camera, juice, audio) {
     const r = map[kind];
     if (!r) return;
     ctx.drawImage(props, r[0], r[1], r[2], r[3], Math.round(x), Math.round(y), r[2], r[3]);
+  }
+
+  function drawCarried(ctx, kind, x, y, dir) {
+    const map = {
+      spareGuitar: [16, 0, 16, 24],
+      guitar: [0, 0, 16, 24],
+      mic: [48, 0, 16, 24],
+      cable: [96, 16, 16, 8],
+      stick: [112, 16, 16, 8],
+    };
+    const r = map[kind];
+    if (!r) return;
+    const tall = kind === "spareGuitar" || kind === "guitar" || kind === "mic";
+    const dw = tall ? 10 : r[2];
+    const dh = tall ? 16 : r[3];
+    const dx = Math.round(x);
+    const dy = Math.round(y);
+    ctx.save();
+    if (dir === "left") {
+      ctx.translate(dx + dw, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(props, r[0], r[1], r[2], r[3], 0, 0, dw, dh);
+    } else {
+      ctx.drawImage(props, r[0], r[1], r[2], r[3], dx, dy, dw, dh);
+    }
+    ctx.restore();
   }
 
   function drawFx(ctx) {
@@ -633,35 +891,101 @@ export function createGame(assets, camera, juice, audio) {
     }
   }
 
-  function pixelText(ctx, text, x, y, key = "WHITE") {
-    ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = PALETTE[key];
-    ctx.font = "8px monospace";
-    ctx.fillText(text, Math.round(x), Math.round(y));
+  const GLYPH = {
+    0: ["111", "101", "101", "101", "111"],
+    1: ["010", "110", "010", "010", "111"],
+    2: ["111", "001", "111", "100", "111"],
+    3: ["111", "001", "111", "001", "111"],
+    4: ["101", "101", "111", "001", "001"],
+    5: ["111", "100", "111", "001", "111"],
+    6: ["111", "100", "111", "101", "111"],
+    7: ["111", "001", "001", "001", "001"],
+    8: ["111", "101", "111", "101", "111"],
+    9: ["111", "101", "111", "001", "111"],
+    L: ["100", "100", "100", "100", "111"],
+    A: ["010", "101", "111", "101", "101"],
+    S: ["111", "100", "111", "001", "111"],
+    T: ["111", "010", "010", "010", "010"],
+    O: ["111", "101", "101", "101", "111"],
+    N: ["101", "111", "111", "101", "101"],
+    G: ["111", "100", "101", "101", "111"],
+    R: ["110", "101", "110", "101", "101"],
+    "!": ["010", "010", "010", "000", "010"],
+    ":": ["000", "010", "000", "010", "000"],
+    C: ["111", "100", "100", "100", "111"],
+    H: ["101", "101", "111", "101", "101"],
+    U: ["101", "101", "101", "101", "111"],
+    B: ["110", "101", "110", "101", "110"],
+    F: ["111", "100", "110", "100", "100"],
+    E: ["111", "100", "111", "100", "111"],
+    X: ["101", "010", "010", "010", "101"],
+  };
+
+  function blitStr(ctx, str, x, y, key) {
+    let ox = Math.round(x);
+    const oy = Math.round(y);
+    for (const ch of str) {
+      if (ch === " ") {
+        ox += 3;
+        continue;
+      }
+      const g = GLYPH[ch];
+      if (g) {
+        for (let row = 0; row < 5; row += 1) {
+          for (let col = 0; col < 3; col += 1) {
+            if (g[row][col] === "1") fill(ctx, key, ox + col, oy + row, 1, 1);
+          }
+        }
+      }
+      ox += 4;
+    }
+  }
+
+  function drawArrow(ctx, x, y) {
+    const bob = Math.round(Math.sin(performance.now() / 110) * 2);
+    const ax = Math.round(x);
+    const ay = Math.round(y) + bob;
+    fill(ctx, "DANGER_RED", ax, ay, 1, 3);
+    fill(ctx, "DANGER_ORANGE", ax - 1, ay + 2, 3, 1);
+    fill(ctx, "WHITE", ax, ay + 3, 1, 1);
   }
 
   function drawHud(ctx) {
-    const t = Math.ceil(state.time);
-    const mm = String(Math.floor(t / 60)).padStart(1, "0");
-    const ss = String(t % 60).padStart(2, "0");
-    pixelText(ctx, `${mm}:${ss}`, 148, 10, "WHITE");
+    if (!state.tutorial.on && state.phase === "play") {
+      const t = Math.max(0, Math.ceil(state.time));
+      const mm = String(Math.floor(t / 60));
+      const ss = String(t % 60).padStart(2, "0");
+      blitStr(ctx, `${mm}:${ss}`, 148, 6, "WHITE");
+    }
+
+    const target = tutorialTarget();
+    if (target) drawArrow(ctx, target.x, target.y);
+    const p1 = state.players[0];
+    const hit = nearestInteract(p1);
+    const canUse = hit || (p1.carrying && p1.carrying.kind === "mic" && state.accidents.feedback.on);
+    if (canUse && state.phase === "play") {
+      blitStr(ctx, "E", p1.x + 4, p1.y - 8, "SUCCESS_GOLD");
+    }
 
     if (state.phase === "title") {
-      fill(ctx, "BG_SHADOW", 40, 58, 240, 70);
-      pixelText(ctx, "LAST SONG!", 118, 78, "SUCCESS_GOLD");
-      pixelText(ctx, "공연은 멈추면 안 된다", 92, 94, "WHITE");
-      pixelText(ctx, "WASD+E / ARROWS+ENTER", 86, 110, "MIC_SILVER");
-      pixelText(ctx, "SPACE", 148, 122, "TENSION_PINK");
+      fill(ctx, "BG_SHADOW", 70, 56, 180, 52);
+      blitStr(ctx, "LAST SONG!", 116, 62, "SUCCESS_GOLD");
+      const nm = venue().name;
+      blitStr(ctx, nm, 160 - nm.length * 2, 74, "WHITE");
+      for (let i = 0; i < VENUES.length; i += 1) {
+        const key = i === venueIndex ? "SUCCESS_GOLD" : "METAL";
+        fill(ctx, key, 148 + i * 8, 86, 4, 4);
+      }
+      fill(ctx, "TENSION_PINK", 156, 96, 8, 2);
     }
     if (state.phase === "win") {
-      fill(ctx, "BG_SHADOW", 50, 70, 220, 44);
-      pixelText(ctx, "LAST SONG CLEAR", 104, 88, "SUCCESS_GOLD");
-      pixelText(ctx, "R to encore", 124, 104, "WHITE");
+      fill(ctx, "BG_SHADOW", 90, 70, 140, 32);
+      blitStr(ctx, venue().name, 160 - venue().name.length * 2, 78, "SUCCESS_GOLD");
+      blitStr(ctx, venueIndex < VENUES.length - 1 ? "NEXT" : "LAST SONG!", 124, 90, "WHITE");
     }
     if (state.phase === "lose") {
-      fill(ctx, "BG_SHADOW", 50, 70, 220, 44);
-      pixelText(ctx, "the song died.", 110, 88, "DANGER_RED");
-      pixelText(ctx, "R to try again", 116, 104, "WHITE");
+      fill(ctx, "BG_SHADOW", 120, 74, 80, 22);
+      blitStr(ctx, "X", 156, 82, "DANGER_RED");
     }
   }
 

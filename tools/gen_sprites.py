@@ -384,11 +384,13 @@ def draw_tiles():
     wood(0, 0, "STAGE_WOOD", "STAGE_WOOD_DK", "STAGE_WOOD_LT")
     wood(16, 0, "STAGE_WOOD_DK", "BG_SHADOW", "STAGE_WOOD")
     wood(32, 0, "STAGE_WOOD_LT", "STAGE_WOOD", "STAGE_WOOD_DK")
-    # backstage darker
-    rect(im, 48, 0, 16, 16, "STAGE_WOOD_DK")
+    # backstage darker than stage
+    rect(im, 48, 0, 16, 16, "BG_SHADOW")
     for x in range(16):
-        put(im, 48 + x, 5, "BG_SHADOW")
-        put(im, 48 + x, 12, "BG_SHADOW")
+        put(im, 48 + x, 5, "STAGE_WOOD_DK")
+        put(im, 48 + x, 12, "STAGE_WOOD_DK")
+    put(im, 51, 2, "METAL_DK")
+    put(im, 58, 9, "METAL_DK")
     # audience floor
     rect(im, 64, 0, 16, 16, "BG_AUDIENCE")
     for y in range(0, 16, 2):
@@ -433,14 +435,18 @@ def draw_props():
     # spare guitar sunburst 16x24
     stamp(im, 16, 0, g, {"W": "WHITE", "g": "SUCCESS_GOLD", "G": "GUITAR_SUN", "w": "METAL", ".": 0})
 
-    # amp 16x16
-    rect(im, 32, 8, 16, 16, "METAL_DK")
-    rect(im, 34, 10, 12, 8, "BLACK")
+    # amp 16x16 — brighter grill + visible jack
+    rect(im, 32, 8, 16, 16, "METAL")
+    rect(im, 33, 9, 14, 14, "METAL_DK")
+    rect(im, 35, 11, 10, 6, "WHITE")
     rect(im, 36, 12, 8, 4, "METAL")
     put(im, 35, 20, "DANGER_RED")
     put(im, 38, 20, "SPARK_YEL")
     put(im, 41, 20, "PEDAL_BLUE")
-    rect(im, 34, 21, 12, 2, "BLACK")
+    put(im, 44, 20, "WHITE")
+    put(im, 45, 20, "BLACK")
+    put(im, 44, 21, "BLACK")
+    rect(im, 34, 22, 10, 1, "BLACK")
 
     # mic stand 16x24
     for y in range(4, 22):
@@ -467,11 +473,12 @@ def draw_props():
     rect(im, 88, 4, 1, 6, "METAL")
     put(im, 88, 3, "MIC_SILVER")
 
-    # cable coil 16x8
+    # cable coil 16x8 — silver highlight so it reads on dark floor
     for x, y in ((2, 2), (3, 1), (4, 1), (5, 2), (6, 3), (7, 3), (8, 2), (9, 1), (10, 2), (11, 3), (12, 2)):
-        put(im, 96 + x, 16 + y, "BLACK")
-        put(im, 96 + x, 17 + y, "METAL_DK")
-    put(im, 96 + 13, 16 + 3, "METAL")
+        put(im, 96 + x, 16 + y, "METAL")
+        put(im, 96 + x, 17 + y, "MIC_SILVER")
+    put(im, 96 + 13, 16 + 3, "WHITE")
+    put(im, 96 + 14, 16 + 3, "SPARK_YEL")
 
     # sticks 16x8
     for i in range(10):
@@ -617,7 +624,7 @@ def draw_crowd():
         "s": "SKIN_SH",
         "e": "BLACK",
         "m": "SKIN_SH",
-        "T": "PEDAL_BLUE",
+        "T": "BG_RAIL",
         "W": "WHITE",
         "L": "METAL_DK",
         "F": "BLACK",
