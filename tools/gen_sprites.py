@@ -402,14 +402,25 @@ def draw_tiles():
     rect(im, 87, 2, 2, 10, "METAL_DK")
     rect(im, 94, 2, 2, 10, "METAL_DK")
 
-    # extra row: night, shadow tile
+    # extra row: night, shadow, metal stage, dark metal
     rect(im, 0, 16, 16, 16, "BG_NIGHT")
     rect(im, 16, 16, 16, 16, "BG_SHADOW")
+    rect(im, 32, 16, 16, 16, "METAL_DK")
+    for x in range(16):
+        put(im, 32 + x, 16 + 4, "METAL")
+        put(im, 32 + x, 16 + 11, "METAL")
+    put(im, 35, 17, "METAL")
+    put(im, 44, 24, "BG_SHADOW")
+    rect(im, 48, 16, 16, 16, "BG_SHADOW")
+    for x in range(16):
+        put(im, 48 + x, 16 + 5, "METAL_DK")
+        put(im, 48 + x, 16 + 12, "METAL_DK")
+    put(im, 51, 18, "METAL")
     im.save(OUT / "tiles.png")
 
 
 def draw_props():
-    im = new_img(160, 48)
+    im = new_img(160, 80)
 
     # guitar 16x24 at 0,0 (red)
     g = [
@@ -516,6 +527,63 @@ def draw_props():
         "........",
     ]
     stamp(im, 48, 24, bang, {"R": "DANGER_RED", "W": "WHITE", ".": 0})
+
+    # broken guitar: same silhouette, snapped neck + empty body
+    gb = [
+        "......WW........",
+        ".....W  W.......",
+        ".....W  W.......",
+        "......WW........",
+        "......W.........",
+        ".......W........",
+        "......W.........",
+        "....WWWWWW......",
+        "...WGG  GGW.....",
+        "...WG    GW.....",
+        "...WG WW GW.....",
+        "...WGG  GGW.....",
+        "....WGGGGw......",
+        ".....WWWW.......",
+        "................",
+        "................",
+    ]
+    stamp(im, 0, 48, gb, {"W": "WHITE", "G": "GUITAR_RED", "w": "METAL", " ": 0, ".": 0})
+    put(im, 7, 54, "DANGER_RED")
+    put(im, 8, 55, "DANGER_ORANGE")
+
+    # unplugged amp: dark grill, empty jack
+    rect(im, 16, 56, 16, 16, "METAL")
+    rect(im, 17, 57, 14, 14, "METAL_DK")
+    rect(im, 19, 59, 10, 6, "BG_SHADOW")
+    rect(im, 20, 60, 8, 4, "BLACK")
+    put(im, 19, 68, "DANGER_RED")
+    put(im, 22, 68, "METAL")
+    put(im, 25, 68, "PEDAL_BLUE")
+    put(im, 28, 68, "BLACK")
+    put(im, 29, 68, "BLACK")
+    put(im, 28, 69, "SPARK_YEL")
+    rect(im, 18, 70, 10, 1, "BLACK")
+
+    # feedback mic: orange head
+    for y in range(52, 70):
+        put(im, 40, y, "METAL_DK")
+    rect(im, 38, 68, 5, 2, "METAL")
+    rect(im, 38, 50, 5, 4, "DANGER_ORANGE")
+    put(im, 40, 49, "SPARK_YEL")
+    put(im, 39, 51, "WHITE")
+    put(im, 41, 52, "DANGER_RED")
+
+    # drum kit without sticks/cymbal
+    rect(im, 66, 60, 18, 10, "DRUM_WHITE")
+    rect(im, 68, 62, 14, 6, "METAL")
+    put(im, 67, 61, "METAL")
+    put(im, 82, 61, "METAL")
+    rect(im, 66, 69, 3, 3, "METAL_DK")
+    rect(im, 81, 69, 3, 3, "METAL_DK")
+    rect(im, 70, 55, 8, 6, "DRUM_WHITE")
+    rect(im, 72, 57, 4, 3, "METAL_DK")
+    rect(im, 86, 56, 6, 8, "DRUM_WHITE")
+    rect(im, 87, 58, 4, 4, "METAL_DK")
 
     im.save(OUT / "props.png")
 

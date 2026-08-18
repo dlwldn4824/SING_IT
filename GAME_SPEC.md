@@ -5,7 +5,7 @@
 > 사용자가 해당 Phase의 정상 작동을 확인하기 전에는 다음 Phase 코드를 작성하지 않는다.
 
 **Current Phase:** Unity `1 — PROJECT FOUNDATION` (대기)  
-**Current Pass:** `PASS 1` A–E 적용됨. 플레이테스트 대기.  
+**Current Pass:** `PASS 1` F–H 적용됨. 플레이테스트 대기.  
 **다음:** 확인 후 `PASS 2 — COLOR SYSTEM`. 승인 없이 시작하지 않음.
 
 ---
