@@ -137,6 +137,10 @@ def npc_cmap(who):
         base["T"] = "METAL_DK"
         base["t"] = "BLACK"
         base["H"] = "HAIR_P1"
+    elif who == "flex":
+        base["T"] = "SHIRT_P2"
+        base["t"] = "SHIRT_P2_DK"
+        base["H"] = "BLACK"
     else:
         base["T"] = "PEDAL_BLUE"
         base["t"] = "METAL_DK"
@@ -147,21 +151,18 @@ def npc_cmap(who):
 def frame_down(who, kind, n, bob=0, panic=False, act=False):
     # 16x24 chibi, big head
     pony = who == "p2"
-    open_mouth = panic
     arm = "T"
     if act:
         arm = "T"
-    mouth = "m" if not open_mouth else "e"
-    eye = "e"
     # head / body / legs. bob shifts body+legs
     rows = [
         "................",
         "....HHHHHH......",
         "...HHHHHHHH.....",
         "...HHSSSSHH.....",
-        f"...HSeSSeSH.....",
-        "...HSSSSSSH.....",
-        f"...HSS{mouth}{mouth}SSH.....",
+        "...HWeSSeWH.....",
+        "...HSSsSSSH.....",
+        "...HSeSSeSH.....",
         "....HSSSHs......",
         ".....HssH.......",
         "......tt........",
@@ -186,17 +187,23 @@ def frame_down(who, kind, n, bob=0, panic=False, act=False):
         rows[3] = "...PHHSSSSHH...."
         rows[8] = ".....HssHP......"
         rows[9] = "......tt.P......"
+    if kind == "idle" and n == 1:
+        rows[4] = "...HssSSssH....."
+    if kind == "idle" and n == 2:
+        rows[6] = "...HSSeeSSH....."
     if panic:
+        rows[2] = "..PPHHHHHHHHW..." if pony else "...HHHHHHHHW...."
         rows[10] = "..T..TTTT..T...."
         rows[11] = ".TT.TTTTTT.TT..."
         rows[12] = "TT..TTWWTT..TT.."
-        rows[4] = "...HSeSSeSH....."
-        rows[6] = "...HSSeeeSH....."
+        rows[4] = "...HWeSSeWH....."
+        rows[6] = "...HSSeWeSH....."
     if act:
         rows[10] = "....TTTTTT......"
         rows[11] = "...TTTTTTTT....."
         rows[12] = "...TTTTWWTTT...."
         rows[13] = "...TTTTTTTTTT..."
+        rows[6] = "...HSSeeeSH....."
     if kind == "walk":
         if n % 2 == 0:
             rows[15] = "....LL...LL....."
@@ -268,15 +275,14 @@ def frame_up(who, kind, n, panic=False, act=False):
 
 def frame_side(who, kind, n, facing="right", panic=False, act=False):
     pony = who == "p2"
-    mouth = "e" if panic else "m"
     rows = [
         "................",
         "...HHHHHH.......",
         "..HHHHHHHH......",
         "..HHHSSSSH......",
-        "..HHSeSSSH......",
-        "..HHSSSSSH......",
-        f"..HHSS{mouth}SSH......",
+        "..HHWeSSSH......",
+        "..HHSsSSSH......",
+        "..HHSSeeSH......",
         "...HSSSsH.......",
         "....HssH........",
         ".....tt.........",
@@ -300,14 +306,21 @@ def frame_side(who, kind, n, facing="right", panic=False, act=False):
         rows[2] = ".PPHHHHHHHH....."
         rows[8] = "....HssHP......."
         rows[9] = ".....tt.P......."
+    if kind == "idle" and n == 1:
+        rows[4] = "..HHssSSSH......"
+    if kind == "idle" and n == 2:
+        rows[6] = "..HHSeSSSH......"
     if panic:
         rows[10] = "T..TTTTTT......."
         rows[11] = "TT.TTTTTTTT....."
-        rows[4] = "..HHSeSSSH......"
+        rows[2] = ".PPHHHHHHHHW...." if pony else "..HHHHHHHW......"
+        rows[4] = "..HHWeSSSH......"
+        rows[6] = "..HHSeWSSH......"
     if act:
         rows[11] = "..TTTTTTTTTT...."
         rows[12] = "..TTTTTTTTTT...."
         rows[13] = "..TTTTTTTTTTT..."
+        rows[6] = "..HHSSeeSH......"
     if kind == "walk":
         if n % 2 == 0:
             rows[15] = "...LL....L......"
@@ -338,11 +351,14 @@ def char_rows(who, direction, kind, n):
         rows = frame_side(who, kind, n, direction, panic, act)
     if bob:
         rows = ["................"] + rows[:-1]
+    for i, row in enumerate(rows):
+        if len(row) != CHAR_W:
+            raise ValueError(f"{who} {direction} {kind}{n} row {i} len {len(row)}: {row!r}")
     return rows
 
 
 def draw_character_sheet():
-    who_list = ["p1", "p2", "vocal", "guitar", "drum"]
+    who_list = ["p1", "p2", "vocal", "guitar", "drum", "flex"]
     cols = len(FRAMES)
     rows_n = len(who_list) * len(DIRS)
     im = new_img(cols * CHAR_W, rows_n * CHAR_H)
@@ -497,6 +513,53 @@ def draw_props():
         put(im, 114 + i, 20, "STAGE_WOOD_LT")
     put(im, 112, 18, "WHITE")
     put(im, 114, 20, "WHITE")
+
+    # bass 16x24 at 96,24 — longer body, darker than guitar
+    bass = [
+        "......WW........",
+        ".....WmmW.......",
+        ".....WmmW.......",
+        "......WW........",
+        "......WW........",
+        "......WW........",
+        "......WW........",
+        "...WWWWWWW......",
+        "..WBBBBBBBW.....",
+        "..WBBBBBBBW.....",
+        "..WBBWWBBBW.....",
+        "..WBBBBBBBW.....",
+        "...WBBBBBw......",
+        "....WWWWW.......",
+        "................",
+        "................",
+    ]
+    stamp(im, 96, 24, bass, {
+        "W": "WHITE", "m": "METAL", "B": "BLACK", "w": "METAL_DK", ".": 0,
+    })
+
+    # 4th guitar 16x24 at 96,48
+    stamp(im, 96, 48, g, {"W": "WHITE", "g": "PEDAL_BLUE", "G": "SHIRT_P1_DK", "w": "METAL", ".": 0})
+
+    # keyboard 24x16 at 128,24
+    keys = [
+        "........................",
+        ".mmmmmmmmmmmmmmmmmmmmmm.",
+        ".WWWWWWWWWWWWWWWWWWWWWW.",
+        ".WBWWBWWBWWBWWBWWBWWBWW.",
+        ".WBWWBWWBWWBWWBWWBWWBWW.",
+        ".WWWWWWWWWWWWWWWWWWWWWW.",
+        ".WWWWWWWWWWWWWWWWWWWWWW.",
+        ".mm..................mm.",
+        ".mm..................mm.",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+        "........................",
+    ]
+    stamp(im, 128, 24, keys, {"W": "WHITE", "B": "BLACK", "m": "METAL_DK", ".": 0})
 
     # box 16x16
     rect(im, 128, 8, 16, 16, "BOX_KRAFT")
@@ -759,10 +822,12 @@ def draw_preview():
     im.alpha_composite(chars.crop((4 * 16, 0, 5 * 16, 24)), (120, 100))
     im.alpha_composite(chars.crop((0, 96, 16, 120)), (200, 140))
 
-    # npcs
-    im.alpha_composite(chars.crop((0, 8 * 24, 16, 9 * 24)), (78, 78))
+    # npcs: vocal, flex, guitar, drum
+    im.alpha_composite(chars.crop((0, 8 * 24, 16, 9 * 24)), (70, 78))
+    im.alpha_composite(chars.crop((0, 20 * 24, 16, 21 * 24)), (116, 78))
     im.alpha_composite(chars.crop((0, 12 * 24, 16, 13 * 24)), (164, 76))
     im.alpha_composite(chars.crop((0, 16 * 24, 16, 17 * 24)), (226, 72))
+    im.alpha_composite(props.crop((96, 24, 112, 48)), (110, 80))
 
     im.save(OUT / "preview_stage.png")
     im.resize((320 * 4, 180 * 4), Image.NEAREST).save(OUT / "preview_stage_4x.png")

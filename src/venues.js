@@ -19,9 +19,10 @@ export const VENUES = [
       micHome: { x: 86, y: 70, w: 16, h: 24 },
     },
     npcs: [
-      { who: "vocal", x: 78, y: 78 },
+      { who: "vocal", x: 70, y: 78 },
       { who: "guitar", x: 164, y: 76 },
       { who: "drum", x: 226, y: 72 },
+      { who: "flex", x: 116, y: 78 },
     ],
     players: [
       { x: 120, y: 100 },
@@ -60,9 +61,10 @@ export const VENUES = [
       micHome: { x: 96, y: 70, w: 16, h: 24 },
     },
     npcs: [
-      { who: "vocal", x: 92, y: 72 },
-      { who: "guitar", x: 150, y: 70 },
+      { who: "vocal", x: 88, y: 72 },
+      { who: "guitar", x: 152, y: 70 },
       { who: "drum", x: 196, y: 68 },
+      { who: "flex", x: 118, y: 72 },
     ],
     players: [
       { x: 120, y: 112 },
@@ -106,6 +108,7 @@ export const VENUES = [
       { who: "vocal", x: 36, y: 72 },
       { who: "guitar", x: 168, y: 74 },
       { who: "drum", x: 260, y: 70 },
+      { who: "flex", x: 108, y: 74 },
     ],
     players: [
       { x: 100, y: 100 },
@@ -144,9 +147,10 @@ export const VENUES = [
       micHome: { x: 72, y: 70, w: 16, h: 24 },
     },
     npcs: [
-      { who: "vocal", x: 68, y: 72 },
+      { who: "vocal", x: 64, y: 72 },
       { who: "guitar", x: 160, y: 74 },
       { who: "drum", x: 220, y: 70 },
+      { who: "flex", x: 108, y: 74 },
     ],
     players: [
       { x: 112, y: 100 },

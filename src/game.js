@@ -2,6 +2,9 @@ import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
 import { axis, tap, held } from "./input.js";
 import { VENUES } from "./venues.js";
+import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
+import { startWireGame, updateWireGame, drawWireGame } from "./wiregame.js";
+import { bandConfig } from "./band.js";
 
 const SHOW = 180;
 const CHAR = { w: 16, h: 24 };
@@ -12,7 +15,7 @@ const FRAMES = {
   act: [8, 9, 10],
   panic: [11, 12],
 };
-const WHO = { p1: 0, p2: 1, vocal: 2, guitar: 3, drum: 4 };
+const WHO = { p1: 0, p2: 1, vocal: 2, guitar: 3, drum: 4, flex: 5 };
 
 function aabb(x, y, w, h) {
   return { x, y, w, h };
@@ -111,6 +114,8 @@ export function createGame(assets, camera, juice, audio) {
       spawnIndex: 0,
       pop: [],
       bubbles: [],
+      drumGame: null,
+      wireGame: null,
       wave: 0,
       hold: null,
       tutorial: { on: !!v.tutorial, step: "move", t: 0, dist: 0 },
@@ -279,13 +284,15 @@ export function createGame(assets, camera, juice, audio) {
       player.act = 0.12;
       return;
     }
-    if (hit.type === "plug" && state.accidents.cable.on) {
+    if (hit.type === "plug" && state.accidents.cable.on && !state.wireGame) {
       const cable = player.carrying;
       player.carrying = null;
       cable.heldBy = null;
       state.pickups = state.pickups.filter((p) => p !== cable);
-      clearAccident("cable", true);
       player.act = 0.2;
+      barkAt(stations.amp.x + 8, stations.amp.y - 4, pick(["헉", "엇!"]));
+      juice.spark(stations.amp.x + 8, stations.amp.y);
+      state.wireGame = startWireGame();
       return;
     }
     if (hit.type === "swap" && state.accidents.string.on) {
@@ -302,13 +309,14 @@ export function createGame(assets, camera, juice, audio) {
       player.act = 0.2;
       return;
     }
-    if (hit.type === "giveStick" && state.accidents.stick.on) {
+    if (hit.type === "giveStick" && state.accidents.stick.on && !state.drumGame) {
       const st = player.carrying;
       player.carrying = null;
       st.heldBy = null;
       state.pickups = state.pickups.filter((p) => p !== st);
-      clearAccident("stick", true);
       player.act = 0.2;
+      barkAt(state.npcs[2].x + 8, state.npcs[2].y - 4, pick(["야!", "오!"]));
+      state.drumGame = startDrumGame(audio);
     }
   }
 
@@ -477,6 +485,8 @@ export function createGame(assets, camera, juice, audio) {
     state.npcs[0].panic = vocalHurt;
     state.npcs[1].panic = guitarHurt;
     state.npcs[2].panic = drumHurt;
+    const flexNpc = state.npcs.find((n) => n.who === "flex");
+    if (flexNpc) flexNpc.panic = bandConfig().flexRole === "guitar2" && guitarHurt;
     for (const n of state.npcs) n.t += dt * (n.panic ? 12 : 4);
 
     let drain = 0;
@@ -652,6 +662,41 @@ export function createGame(assets, camera, juice, audio) {
     const frozen = juice.update(dt);
     if (frozen) return;
 
+    if (state.drumGame) {
+      updateDrumGame(state.drumGame, audio, dt);
+      if (state.drumGame.finished) {
+        const perfect = !!state.drumGame.result?.perfect;
+        state.drumGame = null;
+        clearAccident("stick", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+        if (state.tension <= 0) {
+          state.phase = "lose";
+          audio.setRhythmMode(false);
+          audio.stop();
+        }
+      }
+      return;
+    }
+
+    if (state.wireGame) {
+      updateWireGame(state.wireGame, audio, dt);
+      if (state.wireGame.finished) {
+        const perfect = !!state.wireGame.result?.perfect;
+        state.wireGame = null;
+        clearAccident("cable", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+        if (state.tension <= 0) {
+          state.phase = "lose";
+          audio.stop();
+        }
+      }
+      return;
+    }
+
     updatePlayer(state.players[0], "p1", dt);
     updatePlayer(state.players[1], "p2", dt);
     updatePickups(dt);
@@ -780,7 +825,7 @@ export function createGame(assets, camera, juice, audio) {
     const list = [];
     const cableOn = state.accidents.cable.on;
     const stringOn = state.accidents.string.on;
-    const stickOn = state.accidents.stick.on;
+    const stickOn = state.accidents.stick.on && !state.drumGame;
 
     list.push({
       z: stations.amp.y,
@@ -808,6 +853,18 @@ export function createGame(assets, camera, juice, audio) {
         else blitProp(ctx, 0, 0, 16, 24, stations.guitar.x, stations.guitar.y);
       },
     });
+    const flexNpc = state.npcs.find((n) => n.who === "flex");
+    if (flexNpc) {
+      const role = bandConfig().flexRole;
+      list.push({
+        z: flexNpc.y,
+        draw: () => {
+          if (role === "keys") blitProp(ctx, 128, 24, 24, 16, flexNpc.x - 4, flexNpc.y + 10);
+          else if (role === "guitar2") blitProp(ctx, 96, 48, 16, 24, flexNpc.x - 6, flexNpc.y + 2);
+          else blitProp(ctx, 96, 24, 16, 24, flexNpc.x - 6, flexNpc.y + 2);
+        },
+      });
+    }
 
     for (const n of state.npcs) {
       const anim = n.panic ? "panic" : "idle";
@@ -954,19 +1011,73 @@ export function createGame(assets, camera, juice, audio) {
     F: ["111", "100", "110", "100", "100"],
     E: ["111", "100", "111", "100", "111"],
     X: ["101", "010", "010", "010", "101"],
+    D: ["110", "101", "101", "101", "110"],
+    W: ["10101", "10101", "10101", "01010", "01010"],
+    I: ["111", "010", "010", "010", "111"],
     "?": ["111", "001", "010", "000", "010"],
-    야: ["10101", "10101", "11111", "01010", "10101"],
-    헉: ["01110", "00100", "11111", "10001", "11110"],
-    아: ["01110", "10001", "11111", "00100", "00100"],
-    ㅋ: ["11100", "10100", "11110", "10101", "10100"],
-    엇: ["01110", "10001", "01110", "00100", "01110"],
-    오: ["01110", "10001", "11111", "00100", "01110"],
+    야: [
+      ".111...",
+      "1...1.1",
+      "1...1.1",
+      "1...1..",
+      "1...1.1",
+      "1...1.1",
+      ".111...",
+    ],
+    아: [
+      ".111...",
+      "1...1.1",
+      "1...1.1",
+      "1...111",
+      "1...1.1",
+      "1...1.1",
+      ".111...",
+    ],
+    오: [
+      ".111...",
+      "1...1..",
+      "1...1..",
+      "1...1..",
+      ".111...",
+      "..1....",
+      ".1.1...",
+    ],
+    ㅋ: [
+      "11111..",
+      "1......",
+      "1.111..",
+      "1...1..",
+      "11111..",
+    ],
+    엇: [
+      ".111..1",
+      "1...11.",
+      "1...1.1",
+      "1...11.",
+      ".111...",
+      ".1.1...",
+      "1...1..",
+    ],
+    헉: [
+      "1.1.1..",
+      ".111..1",
+      "1...11.",
+      "1...1.1",
+      "1...11.",
+      ".111.11",
+      "....1..",
+    ],
   };
 
   function glyphW(ch) {
     const g = GLYPH[ch];
     if (!g) return 0;
     return g[0].length;
+  }
+
+  function glyphH(ch) {
+    const g = GLYPH[ch];
+    return g ? g.length : 0;
   }
 
   function measureStr(str) {
@@ -978,9 +1089,16 @@ export function createGame(assets, camera, juice, audio) {
     return Math.max(0, w - 1);
   }
 
+  function measureH(str) {
+    let h = 5;
+    for (const ch of str) h = Math.max(h, glyphH(ch));
+    return h;
+  }
+
   function blitStr(ctx, str, x, y, key) {
     let ox = Math.round(x);
     const oy = Math.round(y);
+    const h = measureH(str);
     for (const ch of str) {
       if (ch === " ") {
         ox += 3;
@@ -988,9 +1106,10 @@ export function createGame(assets, camera, juice, audio) {
       }
       const g = GLYPH[ch];
       if (g) {
+        const gy = oy + Math.floor((h - g.length) / 2);
         for (let row = 0; row < g.length; row += 1) {
           for (let col = 0; col < g[row].length; col += 1) {
-            if (g[row][col] === "1") fill(ctx, key, ox + col, oy + row, 1, 1);
+            if (g[row][col] === "1") fill(ctx, key, ox + col, gy + row, 1, 1);
           }
         }
         ox += glyphW(ch) + 1;
@@ -1002,14 +1121,13 @@ export function createGame(assets, camera, juice, audio) {
     for (const b of state.bubbles) {
       const pop = b.t > 1.0 ? 1 : 0;
       const w = measureStr(b.text);
+      const h = measureH(b.text);
       const x = clamp(Math.round(b.x - w / 2), 2, W - w - 6);
-      const y = clamp(Math.round(b.y - 10 - pop), 2, H - 16);
-      fill(ctx, "BG_SHADOW", x - 2, y - 2, w + 4, 9);
-      fill(ctx, "WHITE", x - 1, y - 1, w + 2, 1);
-      fill(ctx, "WHITE", x - 1, y + 6, w + 2, 1);
+      const y = clamp(Math.round(b.y - h - 4 - pop), 2, H - h - 8);
+      fill(ctx, "BG_SHADOW", x - 2, y - 2, w + 4, h + 4);
       blitStr(ctx, b.text, x, y, "WHITE");
-      fill(ctx, "BG_SHADOW", Math.round(b.x) - 1, y + 7, 3, 2);
-      fill(ctx, "BG_SHADOW", Math.round(b.x), y + 9, 1, 1);
+      fill(ctx, "BG_SHADOW", Math.round(b.x) - 1, y + h + 2, 3, 2);
+      fill(ctx, "BG_SHADOW", Math.round(b.x), y + h + 4, 1, 1);
     }
   }
 
@@ -1067,6 +1185,8 @@ export function createGame(assets, camera, juice, audio) {
     drawFx(ctx);
     drawHud(ctx);
     if (state.phase === "play") drawBubbles(ctx);
+    if (state.drumGame) drawDrumGame(ctx, state.drumGame, audio, fill, blitStr);
+    if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
   }
 
   return { update, draw, reset, getState: () => state };
