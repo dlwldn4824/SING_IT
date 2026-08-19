@@ -3,6 +3,7 @@ import { endFrame } from "./input.js";
 import { createJuice } from "./juice.js";
 import { createAudio } from "./audio.js";
 import { createGame } from "./game.js";
+import { copySheet, setupBand } from "./band.js";
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -18,13 +19,21 @@ const camera = makeCamera(canvas);
 const juice = createJuice();
 const audio = createAudio();
 
+const charsImg = await loadImage("assets/sprites/chars.png");
+const propsImg = await loadImage("assets/sprites/props.png");
+const originals = {
+  chars: copySheet(charsImg),
+  props: copySheet(propsImg),
+};
 const assets = {
-  chars: await loadImage("assets/sprites/chars.png"),
+  chars: copySheet(charsImg),
   tiles: await loadImage("assets/sprites/tiles.png"),
-  props: await loadImage("assets/sprites/props.png"),
+  props: copySheet(propsImg),
   fx: await loadImage("assets/sprites/fx.png"),
   crowd: await loadImage("assets/sprites/crowd.png"),
 };
+
+await setupBand(assets, originals);
 
 const game = createGame(assets, camera, juice, audio);
 

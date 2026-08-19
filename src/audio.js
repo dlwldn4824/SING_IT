@@ -114,6 +114,13 @@ export function createAudio() {
     else g.linearRampToValueAtTime(targets[name], now + (on ? 0.08 : 0.12));
   }
 
+  let rhythmMode = false;
+
+  function setRhythmMode(on) {
+    rhythmMode = !!on;
+    if (on) setStem("drums", false, true);
+  }
+
   function scheduler() {
     if (!started || !ctx) return;
     const horizon = ctx.currentTime + 0.2;
@@ -121,9 +128,11 @@ export function createAudio() {
       const s = step % 16;
       const bar = Math.floor(step / 16) % 4;
       const t = nextStep;
-      if (s === 0 || s === 8) kick(ctx, stems.drums, t);
-      if (s === 4 || s === 12) snare(ctx, stems.drums, t);
-      if (s % 2 === 0) hat(ctx, stems.drums, t, s % 8 === 6);
+      if (!rhythmMode) {
+        if (s === 0 || s === 8) kick(ctx, stems.drums, t);
+        if (s === 4 || s === 12) snare(ctx, stems.drums, t);
+        if (s % 2 === 0) hat(ctx, stems.drums, t, s % 8 === 6);
+      }
       const root = ROOTS[bar];
       if (s % 4 === 0) note(ctx, stems.bass, t, root, "square", 0.22, 0.16);
       if (s % 2 === 0) powerChord(ctx, stems.guitar, t, root * 2, 0.14);
@@ -178,9 +187,27 @@ export function createAudio() {
     if (master) master.gain.value = muted ? 0 : 0.7;
   }
 
+  function playDrum(kind) {
+    ensure();
+    const t = ctx.currentTime;
+    const dest = master;
+    if (kind === "kick") kick(ctx, dest, t);
+    else if (kind === "snare") snare(ctx, dest, t);
+    else if (kind === "hat") hat(ctx, dest, t, false);
+    else hat(ctx, dest, t, true);
+  }
+
+  function now() {
+    ensure();
+    return ctx.currentTime;
+  }
+
   function tick() {
     scheduler();
   }
 
-  return { start, stop, setStem, punch, blip, toggleMute, tick, ensure };
+  return {
+    start, stop, setStem, punch, blip, toggleMute, tick, ensure,
+    setRhythmMode, playDrum, now, sixteenth: SIXTEENTH,
+  };
 }

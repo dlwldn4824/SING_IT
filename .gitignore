@@ -2,3 +2,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .cursor/
+assets/band/*.jpg
+assets/band/*.jpeg
+assets/band/*.png
+assets/band/*.webp
+!assets/band/.gitkeep
