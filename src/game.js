@@ -95,6 +95,7 @@ export function createGame(assets, camera, juice, audio) {
     const v = venue();
     state = {
       phase: "title",
+      loseReason: null,
       time: v.duration,
       tension: 82,
       song: 0,
@@ -463,6 +464,7 @@ export function createGame(assets, camera, juice, audio) {
       a.ttl -= dt;
       if (a.ttl <= 0) {
         a.ttl = 0;
+        state.loseReason = k;
         state.phase = "lose";
         audio.stop();
         return;
@@ -1050,6 +1052,12 @@ export function createGame(assets, camera, juice, audio) {
     D: ["110", "101", "101", "101", "110"],
     W: ["10101", "10101", "10101", "01010", "01010"],
     I: ["111", "010", "010", "010", "111"],
+    K: ["101", "110", "100", "110", "101"],
+    M: ["10001", "11011", "10101", "10101", "10101"],
+    P: ["110", "101", "110", "100", "100"],
+    V: ["101", "101", "101", "101", "010"],
+    Y: ["101", "101", "010", "010", "010"],
+    "-": ["000", "000", "111", "000", "000"],
     "?": ["111", "001", "010", "000", "010"],
     야: [
       ".111...",
@@ -1106,13 +1114,13 @@ export function createGame(assets, camera, juice, audio) {
   };
 
   function glyphW(ch) {
-    const g = GLYPH[ch];
+    const g = GLYPH[ch] || GLYPH[ch.toUpperCase()];
     if (!g) return 0;
     return g[0].length;
   }
 
   function glyphH(ch) {
-    const g = GLYPH[ch];
+    const g = GLYPH[ch] || GLYPH[ch.toUpperCase()];
     return g ? g.length : 0;
   }
 
@@ -1120,7 +1128,7 @@ export function createGame(assets, camera, juice, audio) {
     let w = 0;
     for (const ch of str) {
       if (ch === " ") w += 3;
-      else if (GLYPH[ch]) w += glyphW(ch) + 1;
+      else if (GLYPH[ch] || GLYPH[ch.toUpperCase()]) w += glyphW(ch) + 1;
     }
     return Math.max(0, w - 1);
   }
@@ -1140,7 +1148,7 @@ export function createGame(assets, camera, juice, audio) {
         ox += 3;
         continue;
       }
-      const g = GLYPH[ch];
+      const g = GLYPH[ch] || GLYPH[ch.toUpperCase()];
       if (g) {
         const gy = oy + Math.floor((h - g.length) / 2);
         for (let row = 0; row < g.length; row += 1) {
@@ -1224,8 +1232,20 @@ export function createGame(assets, camera, juice, audio) {
       blitStr(ctx, venueIndex < VENUES.length - 1 ? "NEXT" : "LAST SONG!", 124, 90, "WHITE");
     }
     if (state.phase === "lose") {
-      fill(ctx, "BG_SHADOW", 120, 74, 80, 22);
-      blitStr(ctx, "X", 156, 82, "DANGER_RED");
+      const reasons = {
+        cable: ["CABLE TIMEOUT", "Fix the amp cable in time!"],
+        string: ["GUITAR TROUBLE", "Replace the guitar in time!"],
+        stick: ["DRUM STICK LOST", "Return the drum stick in time!"],
+        feedback: ["MIC FEEDBACK", "Move the mic away in time!"],
+      };
+      const reason = reasons[state.loseReason] || ["SHOW FAILED", "Try again!"];
+      fill(ctx, "BG_SHADOW", 38, 56, 244, 68);
+      const heading = "SHOW FAILED";
+      blitStr(ctx, heading, 160 - Math.floor(measureStr(heading) / 2), 64, "DANGER_RED");
+      blitStr(ctx, reason[0], 160 - Math.floor(measureStr(reason[0]) / 2), 78, "DANGER_ORANGE");
+      blitStr(ctx, reason[1], 160 - Math.floor(measureStr(reason[1]) / 2), 92, "WHITE");
+      const retry = "R - RETRY";
+      blitStr(ctx, retry, 160 - Math.floor(measureStr(retry) / 2), 108, "SUCCESS_GOLD");
     }
   }
 
