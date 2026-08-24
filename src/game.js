@@ -461,6 +461,12 @@ export function createGame(assets, camera, juice, audio) {
       if (!a.on) continue;
       active += 1;
       a.ttl -= dt;
+      if (a.ttl <= 0) {
+        a.ttl = 0;
+        state.phase = "lose";
+        audio.stop();
+        return;
+      }
       if (k === "feedback") {
         state.wave += dt * 14;
         if (Math.random() < 0.08) juice.spark(stations.amp.x + 8, stations.amp.y);
@@ -659,6 +665,8 @@ export function createGame(assets, camera, juice, audio) {
       return;
     }
 
+    state.time -= dt;
+
     const frozen = juice.update(dt);
     if (frozen) return;
 
@@ -701,9 +709,9 @@ export function createGame(assets, camera, juice, audio) {
     updatePlayer(state.players[1], "p2", dt);
     updatePickups(dt);
     updateAccidents(dt);
+    if (state.phase !== "play") return;
     updateTutorial(dt);
 
-    if (!state.tutorial.on) state.time -= dt;
     if (state.tension <= 0) {
       state.phase = "lose";
       audio.stop();
@@ -870,7 +878,16 @@ export function createGame(assets, camera, juice, audio) {
       const anim = n.panic ? "panic" : "idle";
       const seq = FRAMES[anim];
       const frame = seq[Math.floor(n.t) % seq.length];
-      list.push({ z: n.y, draw: () => drawChar(ctx, n.who, "down", frame, n.x, n.y, 1) });
+      list.push({
+        z: n.y,
+        draw: () => {
+          drawChar(ctx, n.who, "down", frame, n.x, n.y, 1);
+          if (n.panic && (n.who === "vocal" || n.who === "guitar" || n.who === "drum")) {
+            fill(ctx, "WHITE", n.x + 14, n.y + 2, 1, 2);
+            fill(ctx, "PEDAL_BLUE", n.x + 14, n.y + 4, 1, 1);
+          }
+        },
+      });
     }
     for (const p of state.pickups) {
       if (p.heldBy) continue;
@@ -980,6 +997,25 @@ export function createGame(assets, camera, juice, audio) {
         fill(ctx, "BLACK", p.x, p.y - 4, 16, 2);
         fill(ctx, "SUCCESS_GOLD", p.x, p.y - 4, Math.round(16 * clamp(state.hold.t / 0.85, 0, 1)), 2);
       }
+    }
+  }
+
+  function drawAccidentTimers(ctx) {
+    const timers = [
+      { accident: state.accidents.cable, x: stations.amp.x, y: stations.amp.y, maxTtl: 10 },
+      { accident: state.accidents.string, x: state.npcs[1].x, y: state.npcs[1].y, maxTtl: 12 },
+      { accident: state.accidents.stick, x: state.npcs[2].x, y: state.npcs[2].y, maxTtl: 12 },
+      { accident: state.accidents.feedback, x: state.npcs[0].x, y: state.npcs[0].y, maxTtl: 9 },
+    ];
+    for (const timer of timers) {
+      if (!timer.accident.on) continue;
+      const ratio = clamp(timer.accident.ttl / timer.maxTtl, 0, 1);
+      const x = Math.round(timer.x - 1);
+      const y = Math.round(timer.y - 7);
+      fill(ctx, "BG_SHADOW", x, y, 18, 4);
+      fill(ctx, "METAL_DK", x + 1, y + 1, 16, 2);
+      const width = Math.round(16 * ratio);
+      if (width > 0) fill(ctx, ratio <= 0.25 ? "DANGER_RED" : "DANGER_ORANGE", x + 1, y + 1, width, 2);
     }
   }
 
@@ -1140,8 +1176,21 @@ export function createGame(assets, camera, juice, audio) {
     fill(ctx, "WHITE", ax, ay + 3, 1, 1);
   }
 
+  function drawNeededItemArrows(ctx) {
+    if (state.tutorial.on || state.phase !== "play") return;
+    const needed = {
+      cable: state.accidents.cable.on,
+      spareGuitar: state.accidents.string.on,
+      stick: state.accidents.stick.on,
+      mic: state.accidents.feedback.on,
+    };
+    for (const p of state.pickups) {
+      if (!p.heldBy && needed[p.kind]) drawArrow(ctx, p.x + 8, p.y - 8);
+    }
+  }
+
   function drawHud(ctx) {
-    if (!state.tutorial.on && state.phase === "play") {
+    if (state.phase === "play") {
       const t = Math.max(0, Math.ceil(state.time));
       const mm = String(Math.floor(t / 60));
       const ss = String(t % 60).padStart(2, "0");
@@ -1150,6 +1199,7 @@ export function createGame(assets, camera, juice, audio) {
 
     const target = tutorialTarget();
     if (target) drawArrow(ctx, target.x, target.y);
+    drawNeededItemArrows(ctx);
     const p1 = state.players[0];
     const hit = nearestInteract(p1);
     const canUse = hit || (p1.carrying && p1.carrying.kind === "mic" && state.accidents.feedback.on);
@@ -1182,6 +1232,7 @@ export function createGame(assets, camera, juice, audio) {
   function draw(ctx) {
     drawWorld(ctx);
     drawEntities(ctx);
+    drawAccidentTimers(ctx);
     drawFx(ctx);
     drawHud(ctx);
     if (state.phase === "play") drawBubbles(ctx);
