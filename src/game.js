@@ -659,6 +659,8 @@ export function createGame(assets, camera, juice, audio) {
       return;
     }
 
+    state.time -= dt;
+
     const frozen = juice.update(dt);
     if (frozen) return;
 
@@ -703,7 +705,6 @@ export function createGame(assets, camera, juice, audio) {
     updateAccidents(dt);
     updateTutorial(dt);
 
-    if (!state.tutorial.on) state.time -= dt;
     if (state.tension <= 0) {
       state.phase = "lose";
       audio.stop();
@@ -1182,7 +1183,7 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawHud(ctx) {
-    if (!state.tutorial.on && state.phase === "play") {
+    if (state.phase === "play") {
       const t = Math.max(0, Math.ceil(state.time));
       const mm = String(Math.floor(t / 60));
       const ss = String(t % 60).padStart(2, "0");
