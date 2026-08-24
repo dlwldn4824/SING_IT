@@ -461,6 +461,12 @@ export function createGame(assets, camera, juice, audio) {
       if (!a.on) continue;
       active += 1;
       a.ttl -= dt;
+      if (a.ttl <= 0) {
+        a.ttl = 0;
+        state.phase = "lose";
+        audio.stop();
+        return;
+      }
       if (k === "feedback") {
         state.wave += dt * 14;
         if (Math.random() < 0.08) juice.spark(stations.amp.x + 8, stations.amp.y);
@@ -703,6 +709,7 @@ export function createGame(assets, camera, juice, audio) {
     updatePlayer(state.players[1], "p2", dt);
     updatePickups(dt);
     updateAccidents(dt);
+    if (state.phase !== "play") return;
     updateTutorial(dt);
 
     if (state.tension <= 0) {
