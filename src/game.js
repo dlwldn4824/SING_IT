@@ -1168,6 +1168,19 @@ export function createGame(assets, camera, juice, audio) {
     fill(ctx, "WHITE", ax, ay + 3, 1, 1);
   }
 
+  function drawNeededItemArrows(ctx) {
+    if (state.tutorial.on || state.phase !== "play") return;
+    const needed = {
+      cable: state.accidents.cable.on,
+      spareGuitar: state.accidents.string.on,
+      stick: state.accidents.stick.on,
+      mic: state.accidents.feedback.on,
+    };
+    for (const p of state.pickups) {
+      if (!p.heldBy && needed[p.kind]) drawArrow(ctx, p.x + 8, p.y - 8);
+    }
+  }
+
   function drawHud(ctx) {
     if (!state.tutorial.on && state.phase === "play") {
       const t = Math.max(0, Math.ceil(state.time));
@@ -1178,6 +1191,7 @@ export function createGame(assets, camera, juice, audio) {
 
     const target = tutorialTarget();
     if (target) drawArrow(ctx, target.x, target.y);
+    drawNeededItemArrows(ctx);
     const p1 = state.players[0];
     const hit = nearestInteract(p1);
     const canUse = hit || (p1.carrying && p1.carrying.kind === "mic" && state.accidents.feedback.on);
