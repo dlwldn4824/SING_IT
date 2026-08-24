@@ -870,7 +870,16 @@ export function createGame(assets, camera, juice, audio) {
       const anim = n.panic ? "panic" : "idle";
       const seq = FRAMES[anim];
       const frame = seq[Math.floor(n.t) % seq.length];
-      list.push({ z: n.y, draw: () => drawChar(ctx, n.who, "down", frame, n.x, n.y, 1) });
+      list.push({
+        z: n.y,
+        draw: () => {
+          drawChar(ctx, n.who, "down", frame, n.x, n.y, 1);
+          if (n.panic && (n.who === "vocal" || n.who === "guitar" || n.who === "drum")) {
+            fill(ctx, "WHITE", n.x + 14, n.y + 2, 1, 2);
+            fill(ctx, "PEDAL_BLUE", n.x + 14, n.y + 4, 1, 1);
+          }
+        },
+      });
     }
     for (const p of state.pickups) {
       if (p.heldBy) continue;
@@ -980,6 +989,25 @@ export function createGame(assets, camera, juice, audio) {
         fill(ctx, "BLACK", p.x, p.y - 4, 16, 2);
         fill(ctx, "SUCCESS_GOLD", p.x, p.y - 4, Math.round(16 * clamp(state.hold.t / 0.85, 0, 1)), 2);
       }
+    }
+  }
+
+  function drawAccidentTimers(ctx) {
+    const timers = [
+      { accident: state.accidents.cable, x: stations.amp.x, y: stations.amp.y, maxTtl: 10 },
+      { accident: state.accidents.string, x: state.npcs[1].x, y: state.npcs[1].y, maxTtl: 12 },
+      { accident: state.accidents.stick, x: state.npcs[2].x, y: state.npcs[2].y, maxTtl: 12 },
+      { accident: state.accidents.feedback, x: state.npcs[0].x, y: state.npcs[0].y, maxTtl: 9 },
+    ];
+    for (const timer of timers) {
+      if (!timer.accident.on) continue;
+      const ratio = clamp(timer.accident.ttl / timer.maxTtl, 0, 1);
+      const x = Math.round(timer.x - 1);
+      const y = Math.round(timer.y - 7);
+      fill(ctx, "BG_SHADOW", x, y, 18, 4);
+      fill(ctx, "METAL_DK", x + 1, y + 1, 16, 2);
+      const width = Math.round(16 * ratio);
+      if (width > 0) fill(ctx, ratio <= 0.25 ? "DANGER_RED" : "DANGER_ORANGE", x + 1, y + 1, width, 2);
     }
   }
 
@@ -1182,6 +1210,7 @@ export function createGame(assets, camera, juice, audio) {
   function draw(ctx) {
     drawWorld(ctx);
     drawEntities(ctx);
+    drawAccidentTimers(ctx);
     drawFx(ctx);
     drawHud(ctx);
     if (state.phase === "play") drawBubbles(ctx);
