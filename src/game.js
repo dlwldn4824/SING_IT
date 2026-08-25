@@ -3,6 +3,8 @@ import { W, H } from "./camera.js";
 import { axis, tap, held } from "./input.js";
 import { VENUES } from "./venues.js";
 import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
+import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
+import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
 import { startWireGame, updateWireGame, drawWireGame } from "./wiregame.js";
 import { bandConfig } from "./band.js";
 
@@ -16,6 +18,15 @@ const FRAMES = {
   panic: [11, 12],
 };
 const WHO = { p1: 0, p2: 1, vocal: 2, guitar: 3, drum: 4, flex: 5 };
+const ACCIDENT_RULES = {
+  cable: { ttl: 10, drain: 2.4 },
+  string: { ttl: 12, drain: 2.7 },
+  stick: { ttl: 11, drain: 2.0 },
+  feedback: { ttl: 8, drain: 3.6 },
+};
+const STICK_SPAWNS = [
+  { x: 48, y: 122 }, { x: 168, y: 122 }, { x: 272, y: 122 },
+];
 
 function aabb(x, y, w, h) {
   return { x, y, w, h };
@@ -116,7 +127,10 @@ export function createGame(assets, camera, juice, audio) {
       pop: [],
       bubbles: [],
       drumGame: null,
+      stringGame: null,
+      micGame: null,
       wireGame: null,
+      miniFlash: 0,
       wave: 0,
       hold: null,
       tutorial: { on: !!v.tutorial, step: "move", t: 0, dist: 0 },
@@ -169,7 +183,7 @@ export function createGame(assets, camera, juice, audio) {
     const acc = state.accidents[kind];
     if (acc.on) return false;
     acc.on = true;
-    acc.ttl = kind === "feedback" ? 9 : kind === "cable" ? 10 : 12;
+    acc.ttl = ACCIDENT_RULES[kind].ttl;
     juice.spark(160, 90);
     camera.shake(1, 0.16);
     audio.blip("danger");
@@ -186,8 +200,9 @@ export function createGame(assets, camera, juice, audio) {
       }
     }
     if (kind === "stick") {
-      const sx = state.tutorial.on ? 168 : 40 + Math.random() * 240;
-      const sy = state.tutorial.on ? 122 : 60 + Math.random() * 70;
+      const spot = state.tutorial.on ? STICK_SPAWNS[1] : pick(STICK_SPAWNS);
+      const sx = spot.x;
+      const sy = spot.y;
       const existing = state.pickups.find((p) => p.kind === "stick");
       if (!existing) state.pickups.push(makePickup("stick", sx, sy));
       else if (!existing.heldBy) {
@@ -223,6 +238,7 @@ export function createGame(assets, camera, juice, audio) {
     juice.hitstop(0.05);
     juice.bang(accidentPos(kind).x, accidentPos(kind).y);
     camera.shake(1, 0.1);
+    state.miniFlash = 0.14;
     audio.blip("fix");
     audio.punch();
     state.tension = clamp(state.tension + (perfect ? 10 : 6), 0, 100);
@@ -270,7 +286,9 @@ export function createGame(assets, camera, juice, audio) {
     if (player.carrying && player.carrying.kind === "mic" && state.accidents.feedback.on) {
       const hitMic = nearestInteract(player);
       if (!hitMic || hitMic.type !== "pickup") {
-        drop(player, 0, 0);
+        player.act = 0.2;
+        state.miniFlash = 0.14;
+        state.micGame = startMicGame();
         return;
       }
     }
@@ -294,6 +312,7 @@ export function createGame(assets, camera, juice, audio) {
       barkAt(stations.amp.x + 8, stations.amp.y - 4, pick(["헉", "엇!"]));
       juice.spark(stations.amp.x + 8, stations.amp.y);
       state.wireGame = startWireGame();
+      state.miniFlash = 0.14;
       return;
     }
     if (hit.type === "swap" && state.accidents.string.on) {
@@ -301,13 +320,12 @@ export function createGame(assets, camera, juice, audio) {
       player.carrying = null;
       if (g) {
         g.heldBy = null;
-        const home = venue().pickups.find((p) => p.kind === "spareGuitar");
-        g.x = home.x;
-        g.y = home.y;
+        state.pickups = state.pickups.filter((p) => p !== g);
       }
-      state.hold = null;
-      clearAccident("string", true);
       player.act = 0.2;
+      barkAt(state.npcs[1].x + 8, state.npcs[1].y - 4, pick(["헉", "엇!"]));
+      state.stringGame = startStringGame();
+      state.miniFlash = 0.14;
       return;
     }
     if (hit.type === "giveStick" && state.accidents.stick.on && !state.drumGame) {
@@ -318,6 +336,7 @@ export function createGame(assets, camera, juice, audio) {
       player.act = 0.2;
       barkAt(state.npcs[2].x + 8, state.npcs[2].y - 4, pick(["야!", "오!"]));
       state.drumGame = startDrumGame(audio);
+      state.miniFlash = 0.14;
     }
   }
 
@@ -340,8 +359,6 @@ export function createGame(assets, camera, juice, audio) {
     const close = Math.min(dAmp, dAmp2) < 28;
     if (close) {
       if (!state.accidents.feedback.on) spawnAccident("feedback");
-    } else if (state.accidents.feedback.on) {
-      clearAccident("feedback", true);
     }
   }
 
@@ -472,11 +489,6 @@ export function createGame(assets, camera, juice, audio) {
       if (k === "feedback") {
         state.wave += dt * 14;
         if (Math.random() < 0.08) juice.spark(stations.amp.x + 8, stations.amp.y);
-        const mic = state.pickups.find((p) => p.kind === "mic");
-        if (mic && !mic.heldBy) {
-          const dAmp = dist(mic.x + 8, mic.y + 12, stations.amp.x + 8, stations.amp.y + 8);
-          if (dAmp >= 28) clearAccident("feedback", true);
-        }
       }
       if (k === "cable" && Math.random() < 0.05) juice.spark(156, 114);
       if (k === "cable" && Math.random() < 0.08) juice.smoke(156, 112);
@@ -498,9 +510,9 @@ export function createGame(assets, camera, juice, audio) {
     for (const n of state.npcs) n.t += dt * (n.panic ? 12 : 4);
 
     let drain = 0;
-    if (guitarHurt) drain += 2.4;
-    if (drumHurt) drain += 2.0;
-    if (vocalHurt) drain += 3.6;
+    if (guitarHurt) drain += Math.max(ACCIDENT_RULES.cable.drain, ACCIDENT_RULES.string.drain);
+    if (drumHurt) drain += ACCIDENT_RULES.stick.drain;
+    if (vocalHurt) drain += ACCIDENT_RULES.feedback.drain;
     if (guitarHurt && drumHurt && vocalHurt) drain += 3;
     if (drain === 0) state.tension = clamp(state.tension + 1.15 * dt, 0, 100);
     else state.tension = clamp(state.tension - drain * dt, 0, 100);
@@ -671,6 +683,7 @@ export function createGame(assets, camera, juice, audio) {
 
     const frozen = juice.update(dt);
     if (frozen) return;
+    state.miniFlash = Math.max(0, state.miniFlash - dt);
 
     if (state.drumGame) {
       updateDrumGame(state.drumGame, audio, dt);
@@ -684,6 +697,48 @@ export function createGame(assets, camera, juice, audio) {
         if (state.tension <= 0) {
           state.phase = "lose";
           audio.setRhythmMode(false);
+          audio.stop();
+        }
+      }
+      return;
+    }
+
+    if (state.stringGame) {
+      updateStringGame(state.stringGame, audio, dt);
+      if (state.stringGame.finished) {
+        const perfect = !!state.stringGame.result?.perfect;
+        state.stringGame = null;
+        clearAccident("string", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+        if (state.tension <= 0) {
+          state.phase = "lose";
+          audio.stop();
+        }
+      }
+      return;
+    }
+
+    if (state.micGame) {
+      updateMicGame(state.micGame, audio, dt);
+      if (state.micGame.finished) {
+        const perfect = !!state.micGame.result?.perfect;
+        const carrier = state.players.find((player) => player.carrying?.kind === "mic");
+        if (carrier) {
+          const mic = carrier.carrying;
+          carrier.carrying = null;
+          mic.heldBy = null;
+          mic.x = venue().safePad.x;
+          mic.y = venue().safePad.y;
+        }
+        state.micGame = null;
+        clearAccident("feedback", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+        if (state.tension <= 0) {
+          state.phase = "lose";
           audio.stop();
         }
       }
@@ -1197,6 +1252,27 @@ export function createGame(assets, camera, juice, audio) {
     }
   }
 
+  function drawTutorialRoute(ctx, target) {
+    if (!target || !state.tutorial.on) return;
+    const p = state.players[0];
+    const dx = target.x - (p.x + 8);
+    const dy = target.y - (p.y + 12);
+    const length = Math.hypot(dx, dy);
+    if (length < 40) return;
+    const steps = Math.min(8, Math.floor(length / 18));
+    for (let i = 1; i < steps; i += 1) {
+      const t = i / steps;
+      fill(ctx, "SUCCESS_GOLD", p.x + 8 + dx * t, p.y + 12 + dy * t, 1, 1);
+    }
+  }
+
+  function drawMiniTransition(ctx) {
+    if (state.miniFlash <= 0) return;
+    const inset = Math.round((state.miniFlash / 0.14) * 10);
+    fill(ctx, "BG_SHADOW", 0, 0, W, inset);
+    fill(ctx, "BG_SHADOW", 0, H - inset, W, inset);
+  }
+
   function drawHud(ctx) {
     if (state.phase === "play") {
       const t = Math.max(0, Math.ceil(state.time));
@@ -1206,6 +1282,7 @@ export function createGame(assets, camera, juice, audio) {
     }
 
     const target = tutorialTarget();
+    drawTutorialRoute(ctx, target);
     if (target) drawArrow(ctx, target.x, target.y);
     drawNeededItemArrows(ctx);
     const p1 = state.players[0];
@@ -1257,7 +1334,10 @@ export function createGame(assets, camera, juice, audio) {
     drawHud(ctx);
     if (state.phase === "play") drawBubbles(ctx);
     if (state.drumGame) drawDrumGame(ctx, state.drumGame, audio, fill, blitStr);
+    if (state.stringGame) drawStringGame(ctx, state.stringGame, fill, blitStr);
+    if (state.micGame) drawMicGame(ctx, state.micGame, fill, blitStr);
     if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
+    drawMiniTransition(ctx);
   }
 
   return { update, draw, reset, getState: () => state };
