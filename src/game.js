@@ -1068,10 +1068,10 @@ export function createGame(assets, camera, juice, audio) {
       crop = walk && oddFrame ? WORKER_FRAMES.side1 : WORKER_FRAMES.side0;
       flip = player.dir === "left";
     }
-    const dw = 24;
-    const dh = 34;
-    const dx = Math.round(player.x - 4);
-    const dy = Math.round(player.y - 10 + (player.squash < 0.96 ? 1 : 0));
+    const dw = 22;
+    const dh = 31;
+    const dx = Math.round(player.x - 3);
+    const dy = Math.round(player.y - 7 + (player.squash < 0.96 ? 1 : 0));
     const h = Math.max(1, Math.round(dh * player.squash));
     ctx.save();
     if (flip) {
@@ -1579,8 +1579,8 @@ export function createGame(assets, camera, juice, audio) {
   function startScaledMini(create) {
     const mini = create();
     const progress = clamp(1 - state.time / venue().duration, 0, 1);
-    const multiplier = 1 - progress * 0.28;
-    const limit = Math.max(2, Math.round(mini.maxTime * multiplier * 10) / 10);
+    const multiplier = 1 - progress * 0.2;
+    const limit = Math.max(2, Math.round((mini.maxTime * multiplier + 1.1) * 10) / 10);
     mini.time = limit;
     mini.maxTime = limit;
     return mini;
