@@ -28,6 +28,15 @@ const STICK_SPAWNS = [
   { x: 48, y: 122 }, { x: 168, y: 122 }, { x: 272, y: 122 },
 ];
 
+function shuffledAccidents() {
+  const order = ["cable", "stick", "string", "feedback"];
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
 function aabb(x, y, w, h) {
   return { x, y, w, h };
 }
@@ -127,6 +136,7 @@ export function createGame(assets, camera, juice, audio) {
         feedback: { on: false, ttl: 0 },
       },
       nextSpawn: v.firstSpawn,
+      spawnOrder: shuffledAccidents(),
       spawnIndex: 0,
       pop: [],
       bubbles: [],
@@ -144,8 +154,6 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   reset();
-
-  const spawnOrder = ["cable", "stick", "string", "feedback"];
 
   function pickupAt(kind) {
     return state.pickups.find((p) => p.kind === kind && !p.heldBy);
@@ -531,8 +539,8 @@ export function createGame(assets, camera, juice, audio) {
 
     if (!state.tutorial.on) state.nextSpawn -= dt;
     if (!state.tutorial.on && state.nextSpawn <= 0) {
-      const ordered = spawnOrder[state.spawnIndex];
-      if (state.spawnIndex < spawnOrder.length) {
+      const ordered = state.spawnOrder[state.spawnIndex];
+      if (state.spawnIndex < state.spawnOrder.length) {
         spawnAccident(ordered);
         state.spawnIndex += 1;
       } else {
@@ -540,7 +548,9 @@ export function createGame(assets, camera, juice, audio) {
         if (pool.length) spawnAccident(pool[Math.floor(Math.random() * pool.length)]);
       }
       const gap = venue().spawnGap;
-      state.nextSpawn = gap[0] + Math.random() * (gap[1] - gap[0]);
+      const randomPhase = state.spawnIndex >= state.spawnOrder.length;
+      const frequency = randomPhase ? 0.65 : 1;
+      state.nextSpawn = (gap[0] + Math.random() * (gap[1] - gap[0])) * frequency;
     }
 
     for (const p of state.pop) p.t -= dt;
@@ -557,7 +567,7 @@ export function createGame(assets, camera, juice, audio) {
   function finishTutorial() {
     state.tutorial.on = false;
     state.tutorial.step = "done";
-    state.nextSpawn = 14;
+    state.nextSpawn = venue().spawnGap[0] * 0.65;
     state.spawnIndex = 4;
   }
 

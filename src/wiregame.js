@@ -70,8 +70,8 @@ export function startWireGame() {
     bounce: 0,
     finished: false,
     result: null,
-    time: 15,
-    maxTime: 15,
+    time: 10,
+    maxTime: 10,
   };
 }
 

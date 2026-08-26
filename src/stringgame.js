@@ -20,10 +20,17 @@ function inRect(pointer, x, y, w, h) {
   return pointer.x >= x && pointer.x < x + w && pointer.y >= y && pointer.y < y + h;
 }
 
+function randomTarget(exclude) {
+  let target = exclude;
+  while (target === exclude) target = Math.floor(Math.random() * (MAX_TENSION + 1));
+  return target;
+}
+
 export function startStringGame() {
-  const targets = [2, 5, 7];
+  const values = [0, 8, 3];
+  const targets = values.map((value) => randomTarget(value));
   return {
-    values: [0, 8, 3],
+    values,
     targets,
     locked: [false, false, false],
     selected: 0,
@@ -33,8 +40,8 @@ export function startStringGame() {
     bounce: 0,
     finished: false,
     result: null,
-    time: 12,
-    maxTime: 12,
+    time: 5,
+    maxTime: 5,
   };
 }
 
