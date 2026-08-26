@@ -9,8 +9,24 @@ export function makeCamera(canvas) {
   let shakeTime = 0;
   let shakeMag = 0;
 
+  function getAvailableHeight() {
+    const parent = canvas.parentElement;
+    if (!parent) return window.innerHeight;
+
+    const siblings = [...parent.children].filter((element) => element !== canvas);
+    const visibleSiblings = siblings.filter((element) => element.getBoundingClientRect().height > 0);
+    const reservedHeight = visibleSiblings.reduce(
+      (total, element) => total + Math.ceil(element.getBoundingClientRect().height),
+      0,
+    );
+    const style = getComputedStyle(parent);
+    const gap = Number.parseFloat(style.rowGap) || 0;
+    const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+    return parent.clientHeight - reservedHeight - gap * visibleSiblings.length - padding;
+  }
+
   function resize() {
-    const maxS = Math.max(1, Math.floor(Math.min(window.innerWidth / W, window.innerHeight / H)));
+    const maxS = Math.max(1, Math.floor(Math.min(window.innerWidth / W, getAvailableHeight() / H)));
     scale = maxS;
     canvas.width = W * scale;
     canvas.height = H * scale;
@@ -52,6 +68,10 @@ export function makeCamera(canvas) {
   }
 
   window.addEventListener("resize", resize);
+  const layoutObserver = new ResizeObserver(resize);
+  for (const sibling of canvas.parentElement?.children || []) {
+    if (sibling !== canvas) layoutObserver.observe(sibling);
+  }
   resize();
   return { ctx, resize, shake, update, begin, end, getScale: () => scale };
 }
