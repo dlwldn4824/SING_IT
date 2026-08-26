@@ -7,6 +7,7 @@ import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.
 import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
 import { startWireGame, updateWireGame, drawWireGame } from "./wiregame.js";
 import { startAmpGame, updateAmpGame, drawAmpGame } from "./ampgame.js";
+import { startWaterGame, updateWaterGame, drawWaterGame } from "./watergame.js";
 import { bandConfig } from "./band.js";
 
 const SHOW = 180;
@@ -25,13 +26,14 @@ const ACCIDENT_RULES = {
   stick: { ttl: 11, drain: 2.0 },
   feedback: { ttl: 8, drain: 3.6 },
   overheat: { ttl: 9, drain: 3.0 },
+  water: { ttl: 14, drain: 2.5 },
 };
 const STICK_SPAWNS = [
   { x: 48, y: 122 }, { x: 168, y: 122 }, { x: 272, y: 122 },
 ];
 
 function shuffledAccidents() {
-  const order = ["cable", "stick", "string", "feedback", "overheat"];
+  const order = ["cable", "stick", "string", "feedback", "overheat", "water"];
   for (let i = order.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
@@ -137,6 +139,7 @@ export function createGame(assets, camera, juice, audio) {
         stick: { on: false, ttl: 0 },
         feedback: { on: false, ttl: 0 },
         overheat: { on: false, ttl: 0 },
+        water: { on: false, ttl: 0 },
       },
       nextSpawn: v.firstSpawn,
       spawnOrder: shuffledAccidents(),
@@ -148,12 +151,13 @@ export function createGame(assets, camera, juice, audio) {
       micGame: null,
       wireGame: null,
       ampGame: null,
+      waterGame: null,
       miniFlash: 0,
       wave: 0,
       hold: null,
       confirmExit: false,
       confirmChoice: 0,
-      tutorial: { on: !!v.tutorial, step: "move", t: 0, dist: 0 },
+      tutorial: { on: !!v.tutorial, step: v.tutorial ? "waterShow" : "move", t: 0, dist: 0 },
     };
   }
 
@@ -187,6 +191,7 @@ export function createGame(assets, camera, juice, audio) {
       stick: ["야!", "ㅋㅋ", "엇!"],
       feedback: ["헉", "아아", "야!"],
       overheat: ["아!", "헉", "야!"],
+      water: ["물!", "헉", "야!"],
     };
     const on = Object.values(state.accidents).filter((a) => a.on).length;
     const text = on >= 2 ? pick(["ㅋㅋㅋ", "야야", "헉"]) : pick(lines[kind] || ["야!"]);
@@ -196,6 +201,17 @@ export function createGame(assets, camera, juice, audio) {
   function barkFix() {
     const n = state.npcs[Math.floor(Math.random() * state.npcs.length)];
     barkAt(n.x + 8, n.y - 4, pick(["오!", "ㅋㅋ", "야!"]));
+  }
+
+  function waterSpot() {
+    const v = venue();
+    return { x: Math.round(v.stage.x + v.stage.w * 0.36), y: 112 };
+  }
+
+  function mopSpot() {
+    return state.tutorial.on ? { x: 272, y: 154 } : pick([
+      { x: 64, y: 154 }, { x: 184, y: 154 }, { x: 272, y: 154 },
+    ]);
   }
 
   function spawnAccident(kind) {
@@ -237,6 +253,15 @@ export function createGame(assets, camera, juice, audio) {
         mic.y = 100;
       }
     }
+    if (kind === "water") {
+      const spot = mopSpot();
+      const existing = state.pickups.find((p) => p.kind === "mop");
+      if (!existing) state.pickups.push(makePickup("mop", spot.x, spot.y));
+      else if (!existing.heldBy) {
+        existing.x = spot.x;
+        existing.y = spot.y;
+      }
+    }
     const pos = accidentPos(kind);
     state.pop.push({ x: pos.x, y: pos.y - 14, t: 0.35, kind: "bang" });
     barkAccident(kind);
@@ -244,6 +269,7 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function accidentPos(kind) {
+    if (kind === "water") return waterSpot();
     if (kind === "cable" || kind === "overheat") return { x: stations.amp.x + 4, y: stations.amp.y - 8 };
     if (kind === "string") return { x: state.npcs[1].x + 4, y: state.npcs[1].y - 10 };
     if (kind === "stick") return { x: state.npcs[2].x + 4, y: state.npcs[2].y - 10 };
@@ -302,6 +328,9 @@ export function createGame(assets, camera, juice, audio) {
         dist(cx, cy, state.npcs[2].x + 8, state.npcs[2].y + 16),
       );
       if (player.carrying.kind === "stick" && dD < reach) return { type: "giveStick" };
+      const wet = waterSpot();
+      const waterD = dist(cx, cy, wet.x + 12, wet.y + 6);
+      if (player.carrying.kind === "mop" && state.accidents.water.on && waterD < reach) return { type: "cleanWater" };
     }
     const ampD = dist(cx, cy, stations.amp.x + 8, stations.amp.y + 8);
     if (state.accidents.overheat.on && ampD < 28) return { type: "coolAmp" };
@@ -326,6 +355,19 @@ export function createGame(assets, camera, juice, audio) {
       juice.spark(stations.amp.x + 8, stations.amp.y);
       state.ampGame = startAmpGame();
       state.miniFlash = 0.14;
+      return;
+    }
+    if (hit.type === "cleanWater" && state.accidents.water.on && !state.waterGame) {
+      const mop = player.carrying;
+      player.carrying = null;
+      if (mop) {
+        mop.heldBy = null;
+        state.pickups = state.pickups.filter((p) => p !== mop);
+      }
+      player.act = 0.2;
+      state.waterGame = startWaterGame();
+      state.miniFlash = 0.14;
+      audio.blip("pickup");
       return;
     }
     if (hit.type === "pickup") {
@@ -512,8 +554,8 @@ export function createGame(assets, camera, juice, audio) {
       const a = state.accidents[k];
       if (!a.on) continue;
       active += 1;
-      const pauseCableDeadline = state.tutorial.on && k === "cable";
-      if (!pauseCableDeadline) a.ttl -= dt;
+      const pauseTutorialDeadline = state.tutorial.on && (k === "cable" || k === "water");
+      if (!pauseTutorialDeadline) a.ttl -= dt;
       if (a.ttl <= 0) {
         a.ttl = 0;
         state.loseReason = k;
@@ -550,6 +592,7 @@ export function createGame(assets, camera, juice, audio) {
     if (guitarHurt) drain += Math.max(ACCIDENT_RULES.cable.drain, ACCIDENT_RULES.string.drain);
     if (drumHurt) drain += ACCIDENT_RULES.stick.drain;
     if (vocalHurt) drain += ACCIDENT_RULES.feedback.drain;
+    if (state.accidents.water.on) drain += ACCIDENT_RULES.water.drain;
     if (guitarHurt && drumHurt && vocalHurt) drain += 3;
     if (drain === 0) state.tension = clamp(state.tension + 1.15 * dt, 0, 100);
     else state.tension = clamp(state.tension - drain * dt, 0, 100);
@@ -604,7 +647,7 @@ export function createGame(assets, camera, juice, audio) {
     state.tutorial.step = "done";
     state.nextSpawn = 6;
     if (venue().id === "school") {
-      state.spawnOrder = ["overheat", ...state.spawnOrder.filter((kind) => kind !== "overheat")];
+      state.spawnOrder = ["water", "overheat", ...state.spawnOrder.filter((kind) => kind !== "water" && kind !== "overheat")];
     }
     state.spawnIndex = 0;
   }
@@ -626,7 +669,14 @@ export function createGame(assets, camera, juice, audio) {
     if (step === "move") {
       const a = axis(state.players[0].id);
       if (a.x || a.y) state.tutorial.dist += 70 * dt;
-      if (state.tutorial.dist > 14) setTutorial("overheatShow");
+      if (state.tutorial.dist > 14) setTutorial("waterShow");
+    } else if (step === "waterShow") {
+      if (!state.accidents.water.on) spawnAccident("water");
+      if (state.tutorial.t > 1.0) setTutorial("waterGet");
+    } else if (step === "waterGet") {
+      if (anyoneCarrying("mop")) setTutorial("waterFix");
+    } else if (step === "waterFix") {
+      if (!state.accidents.water.on) setTutorial("overheatShow");
     } else if (step === "overheatShow") {
       if (!state.accidents.overheat.on) spawnAccident("overheat");
       if (state.tutorial.t > 1.0) setTutorial("overheatFix");
@@ -668,6 +718,11 @@ export function createGame(assets, camera, juice, audio) {
   function tutorialTarget() {
     if (!state.tutorial.on) return null;
     const step = state.tutorial.step;
+    if (step === "waterShow" || step === "waterFix") return waterSpot();
+    if (step === "waterGet") {
+      const mop = pickupAt("mop");
+      return mop ? { x: mop.x + 8, y: mop.y - 6 } : null;
+    }
     if (step === "overheatShow" || step === "overheatFix") {
       return { x: stations.amp.x + 8, y: stations.amp.y - 10 };
     }
@@ -922,6 +977,32 @@ export function createGame(assets, camera, juice, audio) {
       return;
     }
 
+    if (state.waterGame) {
+      updateWaterGame(state.waterGame, audio, dt);
+      if (state.waterGame.finished) {
+        if (!state.waterGame.result?.ok) {
+          if (state.tutorial.on && state.accidents.water.on) {
+            state.waterGame = startWaterGame();
+            state.miniFlash = 0.14;
+            state.tension = Math.max(state.tension, 45);
+            return;
+          }
+          state.waterGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.stop();
+          return;
+        }
+        const perfect = !!state.waterGame.result?.perfect;
+        state.waterGame = null;
+        clearAccident("water", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+      }
+      return;
+    }
+
     for (const player of state.players) updatePlayer(player, player.id, dt);
     updatePickups(dt);
     updateAccidents(dt);
@@ -959,6 +1040,7 @@ export function createGame(assets, camera, juice, audio) {
     if (s === "stringGet" && p.kind === "spareGuitar") return true;
     if (s === "stickGet" && p.kind === "stick") return true;
     if (s === "feedGet" && p.kind === "mic") return true;
+    if (s === "waterGet" && p.kind === "mop") return true;
     for (const pl of state.players) {
       if (nearestInteract(pl)?.item === p) return true;
     }
@@ -1039,6 +1121,13 @@ export function createGame(assets, camera, juice, audio) {
     }
     fill(ctx, "STAGE_WOOD_LT", STAGE.x, BACK.y - 1, STAGE.w, 1);
     fill(ctx, "BG_SHADOW", 0, BACK.y, W, 1);
+    if (state.accidents.water.on) {
+      const wet = waterSpot();
+      fill(ctx, "PEDAL_BLUE", wet.x, wet.y + 3, 24, 8);
+      fill(ctx, "PEDAL_BLUE", wet.x + 5, wet.y, 13, 14);
+      fill(ctx, "WHITE", wet.x + 5, wet.y + 2, 7, 1);
+      fill(ctx, "MIC_SILVER", wet.x + 17, wet.y + 9, 4, 1);
+    }
     if (state.tutorial.on && state.tutorial.step === "feedPlace") {
       fill(ctx, "MIC_SILVER", v.safePad.x, v.safePad.y, 16, 4);
       fill(ctx, "WHITE", v.safePad.x + 2, v.safePad.y + 1, 12, 2);
@@ -1138,6 +1227,12 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawProp(ctx, kind, x, y) {
+    if (kind === "mop") {
+      fill(ctx, "STAGE_WOOD_LT", x + 7, y, 2, 15);
+      fill(ctx, "MIC_SILVER", x + 3, y + 13, 10, 4);
+      fill(ctx, "WHITE", x + 5, y + 14, 6, 1);
+      return;
+    }
     const map = {
       spareGuitar: [16, 0, 16, 24],
       guitar: [0, 0, 16, 24],
@@ -1156,6 +1251,10 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawCarried(ctx, kind, x, y, dir) {
+    if (kind === "mop") {
+      drawProp(ctx, kind, Math.round(x), Math.round(y));
+      return;
+    }
     const map = {
       spareGuitar: [16, 0, 16, 24],
       guitar: [0, 0, 16, 24],
@@ -1220,6 +1319,10 @@ export function createGame(assets, camera, juice, audio) {
         fill(ctx, "DANGER_ORANGE", stations.amp.x + 3, stations.amp.y - 2, 10, 1);
       }
     }
+    if (state.accidents.water.on) {
+      const g = accidentPos("water");
+      ctx.drawImage(props, 48, 24, 8, 12, g.x + 8, g.y - 14 + Math.round(Math.sin(performance.now() / 80)), 8, 12);
+    }
     if (state.hold) {
       const p = state.players.find((pl) => pl.id === state.hold.player);
       if (p) {
@@ -1236,6 +1339,7 @@ export function createGame(assets, camera, juice, audio) {
       { accident: state.accidents.stick, x: state.npcs[2].x, y: state.npcs[2].y, maxTtl: 12 },
       { accident: state.accidents.feedback, x: state.npcs[0].x, y: state.npcs[0].y, maxTtl: 9 },
       { accident: state.accidents.overheat, x: stations.amp.x, y: stations.amp.y, maxTtl: 9 },
+      { accident: state.accidents.water, x: waterSpot().x, y: waterSpot().y, maxTtl: 14 },
     ];
     for (const timer of timers) {
       if (!timer.accident.on) continue;
@@ -1518,6 +1622,7 @@ export function createGame(assets, camera, juice, audio) {
         stick: ["DRUM STICK LOST", "Return the drum stick in time!"],
         feedback: ["MIC FEEDBACK", "Move the mic away in time!"],
         overheat: ["AMP OVERHEAT", "Cool the amp in time!"],
+        water: ["WATER SPILL", "Grab the mop and clean it!"],
         minigame: ["TOO SLOW", "Finish the repair in time!"],
       };
       const reason = reasons[state.loseReason] || ["SHOW FAILED", "Try again!"];
@@ -1532,7 +1637,7 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawMiniTimer(ctx) {
-    const mini = state.drumGame || state.stringGame || state.micGame || state.wireGame || state.ampGame;
+    const mini = state.drumGame || state.stringGame || state.micGame || state.wireGame || state.ampGame || state.waterGame;
     if (!mini || typeof mini.time !== "number") return;
     const ratio = clamp(mini.time / mini.maxTime, 0, 1);
     const key = ratio <= 0.25 ? "DANGER_RED" : "DANGER_ORANGE";
@@ -1568,6 +1673,7 @@ export function createGame(assets, camera, juice, audio) {
     if (state.micGame) drawMicGame(ctx, state.micGame, fill, blitStr);
     if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
     if (state.ampGame) drawAmpGame(ctx, state.ampGame, fill, blitStr);
+    if (state.waterGame) drawWaterGame(ctx, state.waterGame, fill, blitStr);
     drawMiniTimer(ctx);
     drawMiniTransition(ctx);
     drawExitConfirm(ctx);
