@@ -1066,7 +1066,7 @@ export function createGame(assets, camera, juice, audio) {
       crop = walk && oddFrame ? WORKER_FRAMES.up1 : WORKER_FRAMES.up0;
     } else if (player.dir === "left" || player.dir === "right") {
       crop = walk && oddFrame ? WORKER_FRAMES.side1 : WORKER_FRAMES.side0;
-      flip = player.dir === "right";
+      flip = player.dir === "left";
     }
     const dw = 24;
     const dh = 34;
