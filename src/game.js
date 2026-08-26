@@ -1522,23 +1522,6 @@ export function createGame(assets, camera, juice, audio) {
     state.score += earned;
   }
 
-  function drawTutorialLabel(ctx, x, y, key) {
-    const glyphs = [
-      ["111....", ".1.....", "111....", "....1.1", ".....1.", "....1.1"],
-      ["111....", ".1.....", "111....", "....111", "......1", "......1"],
-      ["11.....", ".1.....", ".11....", "....1..", "....1..", "....1.."],
-      [".1.....", "1.1....", ".1.....", "....1..", "....111", "....1.1"],
-    ];
-    for (let i = 0; i < glyphs.length; i += 1) {
-      const glyph = glyphs[i];
-      for (let row = 0; row < glyph.length; row += 1) {
-        for (let col = 0; col < glyph[row].length; col += 1) {
-          if (glyph[row][col] === "1") fill(ctx, key, x + i * 8 + col, y + row, 1, 1);
-        }
-      }
-    }
-  }
-
   function drawBubbles(ctx) {
     for (const b of state.bubbles) {
       const pop = b.t > 1.0 ? 1 : 0;
@@ -1640,7 +1623,7 @@ export function createGame(assets, camera, juice, audio) {
       fill(ctx, "BG_SHADOW", 36, 40, 248, 96);
       blitStr(ctx, "LAST SONG!", 116, 46, "SUCCESS_GOLD");
       const mapButtons = [52, 106, 160, 214];
-      drawTutorialLabel(ctx, 60, 64, "SUCCESS_GOLD");
+      blitStr(ctx, "TUTORIAL", 52 + 24 - Math.floor(measureStr("TUTORIAL") / 2), 64, "SUCCESS_GOLD");
       for (let i = 0; i < VENUES.length; i += 1) {
         const selected = i === venueIndex;
         const x = mapButtons[i];
