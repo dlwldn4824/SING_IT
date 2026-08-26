@@ -1,9 +1,10 @@
 import { PALETTE } from "./palette.js";
 import { tap } from "./input.js";
 
-const TRAVEL = 1.2;
-const PERF = 0.05;
-const GOOD = 0.1;
+const TRAVEL = 1.55;
+const PERF = 0.09;
+const GOOD = 0.17;
+const PASS = 0.35;
 const LANES = [
   { key: "p1l", alt: "p2l", kind: "kick", color: "METAL", label: "A" },
   { key: "p1d", alt: "p2d", kind: "snare", color: "GUITAR_SUN", label: "S" },
@@ -17,29 +18,8 @@ function pushBeat(notes, step, lane) {
 
 function makeChart() {
   const notes = [];
-  for (let i = 0; i < 4; i += 1) pushBeat(notes, i * 4, 0);
-  for (let bar = 0; bar < 4; bar += 1) {
-    const b = 16 + bar * 16;
-    pushBeat(notes, b + 0, 0);
-    pushBeat(notes, b + 0, 2);
-    pushBeat(notes, b + 2, 2);
-    pushBeat(notes, b + 4, 1);
-    pushBeat(notes, b + 4, 2);
-    pushBeat(notes, b + 6, 2);
-    pushBeat(notes, b + 8, 0);
-    pushBeat(notes, b + 8, 2);
-    pushBeat(notes, b + 10, 2);
-    pushBeat(notes, b + 12, 1);
-    pushBeat(notes, b + 12, 2);
-    pushBeat(notes, b + 14, 2);
-    if (bar === 1) pushBeat(notes, b + 8, 3);
-    if (bar === 3) {
-      pushBeat(notes, b + 10, 0);
-      pushBeat(notes, b + 13, 1);
-      pushBeat(notes, b + 14, 3);
-      pushBeat(notes, b + 15, 1);
-    }
-  }
+  const pattern = [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 3, 1];
+  for (let i = 0; i < pattern.length; i += 1) pushBeat(notes, 8 + i * 4, pattern[i]);
   return notes;
 }
 
@@ -53,6 +33,7 @@ export function startDrumGame(audio) {
     combo: 0,
     flash: [0, 0, 0, 0],
     judge: null,
+    failed: false,
     finished: false,
     result: null,
     time: 12,
@@ -84,6 +65,10 @@ function judgeNote(game, note, err) {
 
 export function updateDrumGame(game, audio, dt) {
   if (!game || game.finished) return game;
+  if (game.failed) {
+    if (tap("p1use") || tap("p2use")) Object.assign(game, startDrumGame(audio));
+    return game;
+  }
   game.time = Math.max(0, game.time - dt);
   if (game.time <= 0) {
     game.finished = true;
@@ -131,10 +116,15 @@ export function updateDrumGame(game, audio, dt) {
 
   const last = game.notes[game.notes.length - 1];
   if (now > hitTime(game, last, sixteenth) + 0.45) {
-    game.finished = true;
     const acc = game.hits / game.notes.length;
-    game.result = { perfect: acc >= 0.8, ok: acc >= 0.45, acc };
-    audio.setRhythmMode(false);
+    if (acc >= PASS) {
+      game.finished = true;
+      game.result = { perfect: acc >= 0.8, ok: true, acc };
+      audio.setRhythmMode(false);
+    } else {
+      game.failed = true;
+      game.judge = { text: "X", t: Infinity, key: "DANGER_RED" };
+    }
   }
   return game;
 }
@@ -167,6 +157,7 @@ export function drawDrumGame(ctx, game, audio, fill, blitStr) {
     fill(ctx, "WHITE", x + 3, y + 1, 8, 1);
   }
   if (game.judge) blitStr(ctx, game.judge.text, hx + 30, hy + 4, game.judge.key);
+  if (game.failed) blitStr(ctx, "E", hx + 42, hy + 48, "SUCCESS_GOLD");
   const n = String(game.combo);
   blitStr(ctx, n, hx + 4, hy + 4, "SUCCESS_GOLD");
 }

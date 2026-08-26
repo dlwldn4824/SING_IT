@@ -638,6 +638,7 @@ export function createGame(assets, camera, juice, audio) {
   function finishTutorial() {
     state.tutorial.on = false;
     state.tutorial.step = "done";
+    state.time = venue().duration;
     state.nextSpawn = venue().spawnGap[0] * 0.65;
     state.spawnIndex = state.spawnOrder.length;
   }
