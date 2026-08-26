@@ -1,7 +1,7 @@
 import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
 import { axis, tap, held, getPointer } from "./input.js";
-import { VENUES } from "./venues.js";
+import { VENUES } from "./venues.js?v=five-members";
 import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
 import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
 import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
@@ -81,6 +81,8 @@ export function createGame(assets, camera, juice, audio) {
   const vocalist = document.getElementById("vocalist-image");
   const drummer = document.getElementById("drummer-image");
   const drummerPanic = document.getElementById("drummer-panic-image");
+  const bassist = document.getElementById("bassist-image");
+  const keyboardist = document.getElementById("keyboardist-image");
 
   const solids = [];
   const stations = {
@@ -1085,6 +1087,14 @@ export function createGame(assets, camera, juice, audio) {
     ctx.drawImage(panic ? drummerPanic : drummer, Math.round(x - 17), Math.round(y - 13), 50, 47);
   }
 
+  function drawBassist(ctx, x, y) {
+    ctx.drawImage(bassist, Math.round(x - 10), Math.round(y - 12), 36, 36);
+  }
+
+  function drawKeyboardist(ctx, x, y) {
+    ctx.drawImage(keyboardist, Math.round(x - 14), Math.round(y - 11), 44, 40);
+  }
+
   function stageTile(v, x, y) {
     if (v.id === "club" || v.id === "arena") return ((x + y) / 16) % 2 === 0 ? [32, 16] : [48, 16];
     if (v.id === "fest") return ((x + y) / 16) % 2 === 0 ? [32, 0] : [16, 0];
@@ -1198,7 +1208,7 @@ export function createGame(assets, camera, juice, audio) {
       },
     });
     const flexNpc = state.npcs.find((n) => n.who === "flex");
-    if (flexNpc) {
+    if (flexNpc && !["bass", "keys"].includes(bandConfig().flexRole)) {
       const role = bandConfig().flexRole;
       list.push({
         z: flexNpc.y,
@@ -1214,12 +1224,16 @@ export function createGame(assets, camera, juice, audio) {
       const anim = n.panic ? "panic" : "idle";
       const seq = FRAMES[anim];
       const frame = seq[Math.floor(n.t) % seq.length];
+      const bob = Math.round(Math.sin(n.t * 2.2) * 0.75);
       list.push({
         z: n.y,
         draw: () => {
-          if (n.who === "guitar") drawGuitarist(ctx, n.x, n.y);
-          else if (n.who === "vocal") drawVocalist(ctx, n.x, n.y);
-          else if (n.who === "drum") drawDrummer(ctx, n.x, n.y, n.panic);
+          if (n.who === "guitar") drawGuitarist(ctx, n.x, n.y - bob);
+          else if (n.who === "vocal") drawVocalist(ctx, n.x, n.y - bob);
+          else if (n.who === "drum") drawDrummer(ctx, n.x, n.y - bob, n.panic);
+          else if (n.who === "flex" && bandConfig().flexRole === "bass") drawBassist(ctx, n.x, n.y - bob);
+          else if (n.who === "flex" && bandConfig().flexRole === "keys") drawKeyboardist(ctx, n.x, n.y - bob);
+          else if (n.who === "keys") drawKeyboardist(ctx, n.x, n.y - bob);
           else drawChar(ctx, n.who, "down", frame, n.x, n.y, 1);
           if (n.panic && (n.who === "vocal" || n.who === "guitar" || n.who === "drum")) {
             fill(ctx, "WHITE", n.x + 14, n.y + 2, 1, 2);

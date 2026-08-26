@@ -261,18 +261,12 @@ function adopt(src) {
   if (!looks.flexRole) looks.flexRole = "bass";
 }
 
-function stampPreview(canvas, sheet, who) {
-  const idx = WHO_INDEX[who];
-  if (idx == null) return;
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, 16, 24);
-  ctx.drawImage(sheet, 0, (idx * DIRS) * CHAR_H, 16, 24, 0, 0, 16, 24);
-}
-
-function refreshPreviews(root, assets) {
-  for (const preview of root.querySelectorAll("canvas[data-who]")) {
-    if (WHO_INDEX[preview.dataset.who] != null) stampPreview(preview, assets.chars, preview.dataset.who);
+function refreshPreviews(root) {
+  const flexMember = root.querySelector("#flex-member");
+  if (flexMember) {
+    const role = flexRole();
+    flexMember.src = role === "keys" ? "assets/band/keyboardist.png" : role === "bass" ? "assets/band/bassist.png" : "assets/band/guitarist.png";
+    flexMember.alt = role === "keys" ? "키보드" : role === "bass" ? "베이스" : "기타2";
   }
   for (const btn of root.querySelectorAll("[data-role]")) {
     btn.setAttribute("aria-pressed", btn.dataset.role === flexRole() ? "true" : "false");
@@ -295,7 +289,7 @@ export async function setupBand(assets, originals) {
   const root = document.getElementById("band");
   if (!root) return looks;
 
-  refreshPreviews(root, assets);
+  refreshPreviews(root);
 
   for (const input of root.querySelectorAll("input[type=file]")) {
     input.addEventListener("change", async () => {
@@ -321,7 +315,7 @@ export async function setupBand(assets, originals) {
       }
       save();
       rebuild(assets, originals);
-      refreshPreviews(root, assets);
+      refreshPreviews(root);
     });
   }
 
@@ -331,7 +325,7 @@ export async function setupBand(assets, originals) {
       if (looks.flex) looks.flex.role = looks.flexRole;
       save();
       rebuild(assets, originals);
-      refreshPreviews(root, assets);
+      refreshPreviews(root);
     });
   }
 
@@ -340,7 +334,7 @@ export async function setupBand(assets, originals) {
     looks.flexRole = "bass";
     localStorage.removeItem(STORE);
     rebuild(assets, originals);
-    refreshPreviews(root, assets);
+    refreshPreviews(root);
   });
 
   return looks;

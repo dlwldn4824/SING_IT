@@ -23,6 +23,7 @@ export const VENUES = [
       { who: "guitar", x: 164, y: 76 },
       { who: "drum", x: 226, y: 72 },
       { who: "flex", x: 116, y: 78 },
+      { who: "keys", x: 194, y: 77 },
     ],
     players: [
       { x: 120, y: 100 },
@@ -65,6 +66,7 @@ export const VENUES = [
       { who: "guitar", x: 152, y: 70 },
       { who: "drum", x: 196, y: 68 },
       { who: "flex", x: 118, y: 72 },
+      { who: "keys", x: 170, y: 70 },
     ],
     players: [
       { x: 120, y: 112 },
@@ -109,6 +111,7 @@ export const VENUES = [
       { who: "guitar", x: 168, y: 74 },
       { who: "drum", x: 260, y: 70 },
       { who: "flex", x: 108, y: 74 },
+      { who: "keys", x: 212, y: 74 },
     ],
     players: [
       { x: 100, y: 100 },
@@ -151,6 +154,7 @@ export const VENUES = [
       { who: "guitar", x: 160, y: 74 },
       { who: "drum", x: 220, y: 70 },
       { who: "flex", x: 108, y: 74 },
+      { who: "keys", x: 184, y: 74 },
     ],
     players: [
       { x: 112, y: 100 },

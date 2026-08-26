@@ -39,10 +39,10 @@ canvas {
   cursor: pointer;
 }
 
-.band canvas {
+.band-member {
   width: 48px;
-  height: 72px;
-  background: #1a1520;
+  height: 56px;
+  object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }

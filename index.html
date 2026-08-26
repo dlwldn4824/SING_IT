@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>LAST SONG!</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=member-previews" />
 </head>
 <body>
   <main>
@@ -13,22 +13,17 @@
     <img id="vocalist-image" class="member-source" src="assets/band/vocalist.png" alt="" hidden />
     <img id="drummer-image" class="member-source" src="assets/band/drummer.png" alt="" hidden />
     <img id="drummer-panic-image" class="member-source" src="assets/band/drummer-panic.png" alt="" hidden />
+    <img id="bassist-image" class="member-source" src="assets/band/bassist.png" alt="" hidden />
+    <img id="keyboardist-image" class="member-source" src="assets/band/keyboardist.png" alt="" hidden />
     <div id="band" class="band">
-      <label>보컬<canvas data-who="vocal" width="16" height="24"></canvas></label>
-      <label>기타1<canvas data-who="guitar1" width="16" height="24"></canvas></label>
-      <div class="band-flex">
-        <label>기타2/베이스/키보드<canvas data-who="flex" width="16" height="24"></canvas></label>
-        <div class="roles">
-          <button type="button" data-role="guitar2">기타2</button>
-          <button type="button" data-role="bass" aria-pressed="true">베이스</button>
-          <button type="button" data-role="keys">키보드</button>
-        </div>
-      </div>
-      <label>드럼<canvas data-who="drum" width="16" height="24"></canvas></label>
-      <button type="button" data-reset>기본</button>
+      <label>보컬<img class="band-member" src="assets/band/vocalist.png" alt="보컬" /></label>
+      <label>기타1<img class="band-member" src="assets/band/guitarist.png" alt="기타" /></label>
+      <label>베이스<img class="band-member" src="assets/band/bassist.png" alt="베이스" /></label>
+      <label>키보드<img class="band-member" src="assets/band/keyboardist.png" alt="키보드" /></label>
+      <label>드럼<img class="band-member" src="assets/band/drummer.png" alt="드럼" /></label>
     </div>
     <p class="hint">A/D 무대 선택 · SPACE 시작 · WASD 이동 · E 집기 · Q 버리기 · 전선은 드래그 또는 WASD+E</p>
   </main>
-  <script type="module" src="src/main.js"></script>
+  <script type="module" src="src/main.js?v=five-member-selector"></script>
 </body>
 </html>
