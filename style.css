@@ -89,3 +89,8 @@ canvas {
   letter-spacing: 0.04em;
   color: #9a9692;
 }
+
+body.is-playing .band,
+body.is-playing .hint {
+  display: none;
+}

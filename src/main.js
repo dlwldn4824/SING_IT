@@ -43,6 +43,7 @@ function frame(now) {
   last = now;
   camera.update(dt);
   game.update(dt);
+  document.body.classList.toggle("is-playing", game.getState().phase !== "title");
   const ctx = camera.begin();
   game.draw(ctx);
   camera.end();

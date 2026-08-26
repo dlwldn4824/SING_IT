@@ -123,6 +123,8 @@ export function createGame(assets, camera, juice, audio) {
       loseReason: null,
       time: v.duration,
       tension: 82,
+      score: 0,
+      lastMiniScore: 0,
       song: 0,
       playerCount,
       players: playerCount === 1
@@ -343,7 +345,7 @@ export function createGame(assets, camera, juice, audio) {
       if (!hitMic || hitMic.type !== "pickup") {
         player.act = 0.2;
         state.miniFlash = 0.14;
-        state.micGame = startMicGame();
+        state.micGame = startScaledMini(startMicGame);
         return;
       }
     }
@@ -353,7 +355,7 @@ export function createGame(assets, camera, juice, audio) {
       player.act = 0.2;
       barkAt(stations.amp.x + 8, stations.amp.y - 4, pick(["헉", "엇!", "야!"]));
       juice.spark(stations.amp.x + 8, stations.amp.y);
-      state.ampGame = startAmpGame();
+      state.ampGame = startScaledMini(startAmpGame);
       state.miniFlash = 0.14;
       return;
     }
@@ -365,7 +367,7 @@ export function createGame(assets, camera, juice, audio) {
         state.pickups = state.pickups.filter((p) => p !== mop);
       }
       player.act = 0.2;
-      state.waterGame = startWaterGame();
+      state.waterGame = startScaledMini(startWaterGame);
       state.miniFlash = 0.14;
       audio.blip("pickup");
       return;
@@ -387,7 +389,7 @@ export function createGame(assets, camera, juice, audio) {
       player.act = 0.2;
       barkAt(stations.amp.x + 8, stations.amp.y - 4, pick(["헉", "엇!"]));
       juice.spark(stations.amp.x + 8, stations.amp.y);
-      state.wireGame = startWireGame();
+      state.wireGame = startScaledMini(startWireGame);
       state.miniFlash = 0.14;
       return;
     }
@@ -400,7 +402,7 @@ export function createGame(assets, camera, juice, audio) {
       }
       player.act = 0.2;
       barkAt(state.npcs[1].x + 8, state.npcs[1].y - 4, pick(["헉", "엇!"]));
-      state.stringGame = startStringGame();
+      state.stringGame = startScaledMini(startStringGame);
       state.miniFlash = 0.14;
       return;
     }
@@ -411,7 +413,7 @@ export function createGame(assets, camera, juice, audio) {
       state.pickups = state.pickups.filter((p) => p !== st);
       player.act = 0.2;
       barkAt(state.npcs[2].x + 8, state.npcs[2].y - 4, pick(["야!", "오!"]));
-      state.drumGame = startDrumGame(audio);
+      state.drumGame = startScaledMini(() => startDrumGame(audio));
       state.miniFlash = 0.14;
     }
   }
@@ -854,6 +856,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.drumGame.result?.perfect;
+        addMiniScore(state.drumGame);
         state.drumGame = null;
         clearAccident("stick", perfect);
       } else {
@@ -879,6 +882,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.stringGame.result?.perfect;
+        addMiniScore(state.stringGame);
         state.stringGame = null;
         clearAccident("string", perfect);
       } else {
@@ -903,6 +907,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.micGame.result?.perfect;
+        addMiniScore(state.micGame);
         const carrier = state.players.find((player) => player.carrying?.kind === "mic");
         if (carrier) {
           const mic = carrier.carrying;
@@ -929,7 +934,7 @@ export function createGame(assets, camera, juice, audio) {
       if (state.wireGame.finished) {
         if (!state.wireGame.result?.ok) {
           if (state.tutorial.on && state.accidents.cable.on) {
-            state.wireGame = startWireGame();
+            state.wireGame = startScaledMini(startWireGame);
             state.miniFlash = 0.14;
             state.tension = Math.max(state.tension, 45);
             return;
@@ -941,6 +946,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.wireGame.result?.perfect;
+        addMiniScore(state.wireGame);
         state.wireGame = null;
         clearAccident("cable", perfect);
       } else {
@@ -965,6 +971,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.ampGame.result?.perfect;
+        addMiniScore(state.ampGame);
         state.ampGame = null;
         clearAccident("overheat", perfect);
       } else {
@@ -983,7 +990,7 @@ export function createGame(assets, camera, juice, audio) {
       if (state.waterGame.finished) {
         if (!state.waterGame.result?.ok) {
           if (state.tutorial.on && state.accidents.water.on) {
-            state.waterGame = startWaterGame();
+            state.waterGame = startScaledMini(startWaterGame);
             state.miniFlash = 0.14;
             state.tension = Math.max(state.tension, 45);
             return;
@@ -995,6 +1002,7 @@ export function createGame(assets, camera, juice, audio) {
           return;
         }
         const perfect = !!state.waterGame.result?.perfect;
+        addMiniScore(state.waterGame);
         state.waterGame = null;
         clearAccident("water", perfect);
       } else {
@@ -1494,6 +1502,43 @@ export function createGame(assets, camera, juice, audio) {
     }
   }
 
+  function startScaledMini(create) {
+    const mini = create();
+    const progress = clamp(1 - state.time / venue().duration, 0, 1);
+    const multiplier = 1 - progress * 0.28;
+    const limit = Math.max(2, Math.round(mini.maxTime * multiplier * 10) / 10);
+    mini.time = limit;
+    mini.maxTime = limit;
+    return mini;
+  }
+
+  function addMiniScore(mini) {
+    const timeRatio = clamp(mini.time / mini.maxTime, 0, 1);
+    const accuracy = mini.result?.accuracy ?? (mini.mistakes === undefined
+      ? Math.round(timeRatio * 100)
+      : Math.max(0, 100 - mini.mistakes * 20));
+    const earned = Math.round(accuracy * 10 + timeRatio * 500);
+    state.lastMiniScore = earned;
+    state.score += earned;
+  }
+
+  function drawTutorialLabel(ctx, x, y, key) {
+    const glyphs = [
+      ["111....", ".1.....", "111....", "....1.1", ".....1.", "....1.1"],
+      ["111....", ".1.....", "111....", "....111", "......1", "......1"],
+      ["11.....", ".1.....", ".11....", "....1..", "....1..", "....1.."],
+      [".1.....", "1.1....", ".1.....", "....1..", "....111", "....1.1"],
+    ];
+    for (let i = 0; i < glyphs.length; i += 1) {
+      const glyph = glyphs[i];
+      for (let row = 0; row < glyph.length; row += 1) {
+        for (let col = 0; col < glyph[row].length; col += 1) {
+          if (glyph[row][col] === "1") fill(ctx, key, x + i * 8 + col, y + row, 1, 1);
+        }
+      }
+    }
+  }
+
   function drawBubbles(ctx) {
     for (const b of state.bubbles) {
       const pop = b.t > 1.0 ? 1 : 0;
@@ -1564,6 +1609,8 @@ export function createGame(assets, camera, juice, audio) {
       fill(ctx, "METAL_DK", 27, 7, 48, 3);
       if (fanWidth > 0) fill(ctx, fanKey, 27, 7, fanWidth, 3);
       blitStr(ctx, String(Math.round(state.tension)), 80, 5, fanKey);
+      blitStr(ctx, "SCORE", 218, 5, "WHITE");
+      blitStr(ctx, String(state.score), 250, 5, "SUCCESS_GOLD");
     }
 
     if (state.phase === "play" && state.tutorial.on) {
@@ -1593,6 +1640,7 @@ export function createGame(assets, camera, juice, audio) {
       fill(ctx, "BG_SHADOW", 36, 40, 248, 96);
       blitStr(ctx, "LAST SONG!", 116, 46, "SUCCESS_GOLD");
       const mapButtons = [52, 106, 160, 214];
+      drawTutorialLabel(ctx, 60, 64, "SUCCESS_GOLD");
       for (let i = 0; i < VENUES.length; i += 1) {
         const selected = i === venueIndex;
         const x = mapButtons[i];
@@ -1627,13 +1675,15 @@ export function createGame(assets, camera, juice, audio) {
         minigame: ["TOO SLOW", "Finish the repair in time!"],
       };
       const reason = reasons[state.loseReason] || ["SHOW FAILED", "Try again!"];
-      fill(ctx, "BG_SHADOW", 38, 56, 244, 68);
+      fill(ctx, "BG_SHADOW", 38, 52, 244, 76);
       const heading = "SHOW FAILED";
-      blitStr(ctx, heading, 160 - Math.floor(measureStr(heading) / 2), 64, "DANGER_RED");
-      blitStr(ctx, reason[0], 160 - Math.floor(measureStr(reason[0]) / 2), 78, "DANGER_ORANGE");
-      blitStr(ctx, reason[1], 160 - Math.floor(measureStr(reason[1]) / 2), 92, "WHITE");
+      blitStr(ctx, heading, 160 - Math.floor(measureStr(heading) / 2), 60, "DANGER_RED");
+      blitStr(ctx, reason[0], 160 - Math.floor(measureStr(reason[0]) / 2), 74, "DANGER_ORANGE");
+      blitStr(ctx, reason[1], 160 - Math.floor(measureStr(reason[1]) / 2), 86, "WHITE");
+      blitStr(ctx, "SCORE", 112, 101, "WHITE");
+      blitStr(ctx, String(state.score), 150, 101, "SUCCESS_GOLD");
       const retry = "R - RETRY";
-      blitStr(ctx, retry, 160 - Math.floor(measureStr(retry) / 2), 108, "SUCCESS_GOLD");
+      blitStr(ctx, retry, 160 - Math.floor(measureStr(retry) / 2), 115, "SUCCESS_GOLD");
     }
   }
 
@@ -1647,6 +1697,28 @@ export function createGame(assets, camera, juice, audio) {
     const width = Math.round(46 * ratio);
     if (width > 0) fill(ctx, key, 129, 8, width, 3);
     blitStr(ctx, String(Math.max(0, Math.ceil(mini.time))), 180, 7, key);
+  }
+
+  function drawSchoolMiniGuide(ctx) {
+    if (venue().id !== "school" || !state.tutorial.on) return;
+    let text = "";
+    if (state.waterGame) text = "커서(마우스)를 누른 채 물을 문지르세요";
+    else if (state.ampGame) text = "A · D 키를 빛나는 순서대로 번갈아 누르세요";
+    else if (state.wireGame) text = "커서로 같은 색 단자에서 단자까지 드래그하세요";
+    else if (state.stringGame) text = "W/S 선택 · A/D 조절 · E 고정  (커서 조절 가능)";
+    else if (state.drumGame) text = "내려오는 W/A/S/D 키를 같은 줄에서 누르세요";
+    else if (state.micGame) text = "A/D로 이동 · E로 놓기  (커서로도 조절 가능)";
+    if (!text) return;
+
+    fill(ctx, "BG_SHADOW", 22, 18, 276, 14);
+    fill(ctx, "METAL_DK", 24, 20, 272, 10);
+    ctx.save();
+    ctx.fillStyle = PALETTE.WHITE;
+    ctx.font = "bold 7px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 160, 25);
+    ctx.restore();
   }
 
   function drawExitConfirm(ctx) {
@@ -1675,6 +1747,7 @@ export function createGame(assets, camera, juice, audio) {
     if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
     if (state.ampGame) drawAmpGame(ctx, state.ampGame, fill, blitStr);
     if (state.waterGame) drawWaterGame(ctx, state.waterGame, fill, blitStr);
+    drawSchoolMiniGuide(ctx);
     drawMiniTimer(ctx);
     drawMiniTransition(ctx);
     drawExitConfirm(ctx);
