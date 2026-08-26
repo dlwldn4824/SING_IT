@@ -10,20 +10,19 @@
   <main>
     <canvas id="game" width="320" height="180"></canvas>
     <div id="band" class="band">
-      <label>보컬<canvas data-who="vocal" width="16" height="24"></canvas><input type="file" accept="image/*" data-who="vocal" /></label>
-      <label>기타1<canvas data-who="guitar1" width="16" height="24"></canvas><input type="file" accept="image/*" data-who="guitar1" /></label>
+      <label>보컬<canvas data-who="vocal" width="16" height="24"></canvas></label>
+      <label>기타1<canvas data-who="guitar1" width="16" height="24"></canvas></label>
       <div class="band-flex">
-        <label>기타2/베이스/키보드<canvas data-who="flex" width="16" height="24"></canvas><input type="file" accept="image/*" data-who="flex" /></label>
+        <label>기타2/베이스/키보드<canvas data-who="flex" width="16" height="24"></canvas></label>
         <div class="roles">
           <button type="button" data-role="guitar2">기타2</button>
           <button type="button" data-role="bass" aria-pressed="true">베이스</button>
           <button type="button" data-role="keys">키보드</button>
         </div>
       </div>
-      <label>드럼<canvas data-who="drum" width="16" height="24"></canvas><input type="file" accept="image/*" data-who="drum" /></label>
+      <label>드럼<canvas data-who="drum" width="16" height="24"></canvas></label>
       <button type="button" data-reset>기본</button>
     </div>
-    <p class="hint">assets/band/에 vocal.png, guitar1.png, drum.png, 그리고 guitar2.png / bass.png / keys.png 중 하나 → python tools/gen_band.py. 얼굴은 16×24로 들어가지 않고 머리·피부·옷·악기색만 맞춥니다.</p>
     <p class="hint">A/D 무대 선택 · SPACE 시작 · WASD 이동 · E 집기 · Q 버리기 · 전선은 드래그 또는 WASD+E</p>
   </main>
   <script type="module" src="src/main.js"></script>

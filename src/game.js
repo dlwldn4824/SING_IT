@@ -128,7 +128,7 @@ export function createGame(assets, camera, juice, audio) {
       song: 0,
       playerCount,
       players: playerCount === 1
-        ? [makePlayer("p2", v.players[1].x, v.players[1].y, "p2")]
+        ? [makePlayer("p1", v.players[0].x, v.players[0].y, "p1")]
         : [
           makePlayer("p1", v.players[0].x, v.players[0].y, "p1"),
           makePlayer("p2", v.players[1].x, v.players[1].y, "p2"),

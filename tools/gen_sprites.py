@@ -27,6 +27,8 @@ PAL = {
     "SHIRT_P1_DK": (36, 56, 176, 255),
     "SHIRT_P2": (232, 200, 74, 255),
     "SHIRT_P2_DK": (176, 144, 32, 255),
+    "PLAYER_PURPLE": (154, 92, 200, 255),
+    "PLAYER_PURPLE_DK": (99, 59, 142, 255),
     "WHITE": (244, 240, 232, 255),
     "BLACK": (20, 18, 16, 255),
     "GUITAR_RED": (196, 60, 60, 255),
@@ -94,20 +96,28 @@ def crew_cmap(who):
             "W": "WHITE",
             "e": "BLACK",
             "m": "SKIN_SH",
+            "C": "BLACK",
+            "B": "WHITE",
+            "K": "METAL_DK",
+            "R": "SUCCESS_GOLD",
+            "r": "GUITAR_SUN",
             ".": 0,
         }
     return {
-        "H": "HAIR_P2",
+        "H": "HAIR_P1",
         "S": "SKIN",
         "s": "SKIN_SH",
-        "T": "SHIRT_P2",
-        "t": "SHIRT_P2_DK",
-        "L": "HAIR_P2",
+        "T": "PLAYER_PURPLE",
+        "t": "PLAYER_PURPLE_DK",
+        "L": "HAIR_P1",
         "F": "BLACK",
         "W": "WHITE",
         "e": "BLACK",
         "m": "SKIN_SH",
-        "P": "HAIR_P2",
+        "P": "HAIR_P1",
+        "C": "BLACK",
+        "R": "SUCCESS_GOLD",
+        "r": "GUITAR_SUN",
         ".": 0,
     }
 
@@ -127,16 +137,18 @@ def npc_cmap(who):
         "M": "MIC_SILVER",
         "D": "DRUM_WHITE",
         "d": "METAL_DK",
+        "C": "BLACK",
+        "V": "PLAYER_PURPLE",
         ".": 0,
     }
     if who == "vocal":
-        base["T"] = "GUITAR_RED"
-        base["t"] = "DANGER_RED"
-        base["H"] = "HAIR_P2"
+        base["T"] = "PLAYER_PURPLE"
+        base["t"] = "PLAYER_PURPLE_DK"
+        base["H"] = "TENSION_PINK"
     elif who == "guitar":
-        base["T"] = "METAL_DK"
-        base["t"] = "BLACK"
-        base["H"] = "HAIR_P1"
+        base["T"] = "PEDAL_BLUE"
+        base["t"] = "SHIRT_P1_DK"
+        base["H"] = "SHIRT_P1_DK"
     elif who == "flex":
         base["T"] = "SHIRT_P2"
         base["t"] = "SHIRT_P2_DK"
@@ -146,6 +158,165 @@ def npc_cmap(who):
         base["t"] = "METAL_DK"
         base["H"] = "HAIR_P1"
     return base
+
+
+def paint_role(who, rows, view, panic=False, act=False):
+    if who in ("p1", "p2"):
+        if view == "down":
+            rows[0] = ".....CCCC......."
+            rows[1] = "....CRRRRC......"
+            rows[2] = "...CRRRRRRC....."
+            rows[3] = "...CrrrrrrC....."
+            rows[4] = "...CCCCCCCC....."
+            rows[5] = "...CSSSSSSC....."
+            rows[6] = "...CSSeSSSC....."
+            rows[7] = "...CSSSSSSC....."
+            rows[8] = "....CssssC......"
+            rows[9] = ".....CCCC......."
+            rows[10] = "....WTTTTW......"
+            if panic:
+                rows[0] = ".....CCCW......."
+                rows[12] = "TT..TTWWTT..TT.."
+            if act:
+                rows[12] = "...TTTTTTTTT...."
+        elif view == "up":
+            rows[0] = ".....CCCC......."
+            rows[1] = "....CRRRRC......"
+            rows[2] = "...CRRRRRRC....."
+            rows[3] = "...CrrrrrrC....."
+            rows[4] = "...CCCCCCCC....."
+            rows[5] = "...CHHHHHHC....."
+            rows[6] = "...CHHHHHHC....."
+            rows[7] = "....CHHHHC......"
+            rows[8] = ".....CCCC......."
+            if panic:
+                rows[0] = ".....CCCW......."
+        elif view == "side":
+            rows[0] = "...CCCC........."
+            rows[1] = "..CRRRRC........"
+            rows[2] = ".CRRRRRRC......."
+            rows[3] = ".CrrrrrrC......."
+            rows[4] = ".CCCCCCCC......."
+            rows[5] = ".CSSSSSSC......."
+            rows[6] = ".CSSeSSSC......."
+            rows[7] = ".CSSSSSSC......."
+            rows[8] = "..CssssC........"
+            rows[9] = "...CCCC........."
+            rows[10] = "..WTTTTW........"
+            if panic:
+                rows[0] = "...CCCW........."
+    elif who == "vocal":
+        if view == "down":
+            rows[0] = "...C.C..C.C....."
+            rows[1] = "..CHHHHHHHC....."
+            rows[2] = ".CHHHHHHHHHC...."
+            rows[3] = ".CHHSSSSHHHC...."
+            rows[4] = ".CHWeSSeWHHC...."
+            rows[5] = ".CHSSSSSSHHC...."
+            rows[6] = ".CHSSeSeSHHC...."
+            rows[7] = ".CHHSSSSHHHC...."
+            rows[8] = "..CHHssHHHC....."
+        elif view == "up":
+            rows[0] = "...C.C..C.C....."
+            rows[1] = "..CHHHHHHHC....."
+            rows[2] = ".CHHHHHHHHHC...."
+            rows[3] = ".CHHHHHHHHHC...."
+            rows[4] = ".CHHHHHHHHHC...."
+            rows[5] = ".CHHHHHHHHHC...."
+            rows[6] = "..CHHHHHHHC....."
+            rows[7] = "...CHHHHHC......"
+        elif view == "side":
+            rows[0] = "..C.C..C........"
+            rows[1] = ".CHHHHHHC......."
+            rows[2] = "CHHHHHHHHC......"
+            rows[3] = "CHHSSSSHHC......"
+            rows[4] = "CHWeSSSHHC......"
+            rows[5] = "CHSSSSSHHC......"
+            rows[6] = "CHSSeSSHHC......"
+            rows[7] = ".CHSSSHHC......."
+            rows[8] = "..CHssHHC......."
+        if panic and view == "down":
+            rows[0] = "..H..HH..HW....."
+        if panic and view == "side":
+            rows[0] = ".H..HHHW........"
+    elif who == "guitar":
+        if view == "down":
+            rows[0] = "....C.C.C......."
+            rows[1] = "...CHHHHHC......"
+            rows[2] = "..CHHHHHHHC....."
+            rows[3] = "..CHSSSSSHC....."
+            rows[4] = "..CHWeSSeHC....."
+            rows[5] = "..CHSSSSSHC....."
+            rows[6] = "..CHSSeSeHC....."
+            rows[7] = "...CHSSSHC......"
+            rows[8] = "....CHssHC......"
+        elif view == "up":
+            rows[0] = "....C.C.C......."
+            rows[1] = "...CHHHHHC......"
+            rows[2] = "..CHHHHHHHC....."
+            rows[3] = "..CHHHHHHHC....."
+            rows[4] = "..CHHHHHHHC....."
+            rows[5] = "...CHHHHHC......"
+            rows[6] = "....CHHHC......."
+        elif view == "side":
+            rows[0] = "...C.C.C........"
+            rows[1] = "..CHHHHC........"
+            rows[2] = ".CHHHHHHC......."
+            rows[3] = ".CHSSSSHC......."
+            rows[4] = ".CHWeSSHC......."
+            rows[5] = ".CHSSSSHC......."
+            rows[6] = ".CHSSeSHC......."
+            rows[7] = "..CHSSHHC......."
+            rows[8] = "...CHssHC......."
+        if panic and view == "down":
+            rows[0] = "..H.H..H.HW....."
+        if panic and view == "side":
+            rows[0] = "H.H.HHHW........"
+    elif who == "drum":
+        if view == "down":
+            rows[14] = "....TTTTTT......"
+            rows[15] = "....LLLLLL......"
+            rows[16] = "....LL..LL......"
+            rows[17] = "....FFFFFF......"
+            rows[18] = "................"
+    elif who == "flex":
+        if view == "down":
+            rows[0] = "....CCCCCC......"
+            rows[1] = "...CHHHHHC......"
+            rows[2] = "..CHHHHHHHC....."
+            rows[3] = "..CHSSSSSHC....."
+            rows[4] = "..CHWeSSeHC....."
+            rows[5] = "..CHSSSSSHC....."
+            rows[6] = "..CHSSeSeHC....."
+            rows[7] = "...CHSSSHC......"
+            rows[8] = "....CHssHC......"
+            rows[9] = ".....CVVC......."
+        elif view == "up":
+            rows[0] = "....CCCCCC......"
+            rows[1] = "...CHHHHHC......"
+            rows[2] = "..CHHHHHHHC....."
+            rows[3] = "..CHHHHHHHC....."
+            rows[4] = "..CHHHHHHHC....."
+            rows[5] = "...CHHHHHC......"
+            rows[6] = "....CHHHC......."
+        elif view == "side":
+            rows[0] = "...CCCCC........"
+            rows[1] = "..CHHHHC........"
+            rows[2] = ".CHHHHHHC......."
+            rows[3] = ".CHSSSSHC......."
+            rows[4] = ".CHWeSSHC......."
+            rows[5] = ".CHSSSSHC......."
+            rows[6] = ".CHSSeSHC......."
+            rows[7] = "..CHSSHHC......."
+            rows[8] = "...CHssHC......."
+            rows[9] = "....CVVC........"
+        elif view == "side":
+            rows[14] = "...TTTTTT......."
+            rows[15] = "...LLLLLL......."
+            rows[16] = "...LL..LL......."
+            rows[17] = "...FFFFFF......."
+            rows[18] = "................"
+    return rows
 
 
 def frame_down(who, kind, n, bob=0, panic=False, act=False):
@@ -215,6 +386,7 @@ def frame_down(who, kind, n, bob=0, panic=False, act=False):
             rows[16] = ".....L...LL....."
             rows[17] = "....LL...LL....."
             rows[18] = "...FFF...FFF...."
+    paint_role(who, rows, "down", panic, act)
     # apply bob by prepending empty / cropping — handled at blit
     return rows, bob
 
@@ -270,6 +442,7 @@ def frame_up(who, kind, n, panic=False, act=False):
     if act:
         rows[12] = "...TTTTTTTTTT..."
         rows[13] = "...TTTTTTTTTT..."
+    paint_role(who, rows, "up", panic, act)
     return rows
 
 
@@ -332,6 +505,7 @@ def frame_side(who, kind, n, facing="right", panic=False, act=False):
             rows[16] = "...LL...LL......"
             rows[17] = "...L....LL......"
             rows[18] = "..FFF...FFF....."
+    paint_role(who, rows, "side", panic, act)
     if facing == "left":
         rows = [row[::-1] for row in rows]
     return rows
