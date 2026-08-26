@@ -55,6 +55,8 @@ export function startDrumGame(audio) {
     judge: null,
     finished: false,
     result: null,
+    time: 12,
+    maxTime: 12,
   };
 }
 
@@ -82,6 +84,14 @@ function judgeNote(game, note, err) {
 
 export function updateDrumGame(game, audio, dt) {
   if (!game || game.finished) return game;
+  game.time = Math.max(0, game.time - dt);
+  if (game.time <= 0) {
+    game.finished = true;
+    game.result = { perfect: false, ok: false, timedOut: true };
+    audio.setRhythmMode(false);
+    audio.blip("danger");
+    return game;
+  }
   const now = audio.now();
   const sixteenth = audio.sixteenth;
   if (game.judge) {

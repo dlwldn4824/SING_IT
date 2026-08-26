@@ -23,6 +23,8 @@ export function startMicGame() {
     bounce: 0,
     finished: false,
     result: null,
+    time: 8,
+    maxTime: 8,
   };
 }
 
@@ -48,6 +50,13 @@ function placeMic(game, audio) {
 
 export function updateMicGame(game, audio, dt) {
   if (!game || game.finished) return game;
+  game.time = Math.max(0, game.time - dt);
+  if (game.time <= 0) {
+    game.finished = true;
+    game.result = { perfect: false, ok: false, timedOut: true };
+    audio.blip("danger");
+    return game;
+  }
   game.bounce += dt * 8;
   game.flash = Math.max(0, game.flash - dt);
   if (tap("p1l") || tap("p2l")) moveMic(game, -1, audio);

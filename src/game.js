@@ -1,6 +1,6 @@
 import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
-import { axis, tap, held } from "./input.js";
+import { axis, tap, held, getPointer } from "./input.js";
 import { VENUES } from "./venues.js";
 import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
 import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
@@ -74,6 +74,7 @@ export function createGame(assets, camera, juice, audio) {
     micHome: { x: 86, y: 70, w: 16, h: 24 },
   };
   let venueIndex = 0;
+  let playerCount = 1;
   const venue = () => VENUES[venueIndex];
 
   function applyLayout() {
@@ -110,10 +111,13 @@ export function createGame(assets, camera, juice, audio) {
       time: v.duration,
       tension: 82,
       song: 0,
-      players: [
-        makePlayer("p1", v.players[0].x, v.players[0].y, "p1"),
-        makePlayer("p2", v.players[1].x, v.players[1].y, "p2"),
-      ],
+      playerCount,
+      players: playerCount === 1
+        ? [makePlayer("p2", v.players[1].x, v.players[1].y, "p2")]
+        : [
+          makePlayer("p1", v.players[0].x, v.players[0].y, "p1"),
+          makePlayer("p2", v.players[1].x, v.players[1].y, "p2"),
+        ],
       npcs: v.npcs.map((n) => ({ who: n.who, x: n.x, y: n.y, dir: "down", panic: false, t: 0 })),
       pickups: v.pickups.map((p) => makePickup(p.kind, p.x, p.y)),
       accidents: {
@@ -133,6 +137,8 @@ export function createGame(assets, camera, juice, audio) {
       miniFlash: 0,
       wave: 0,
       hold: null,
+      confirmExit: false,
+      confirmChoice: 0,
       tutorial: { on: !!v.tutorial, step: "move", t: 0, dist: 0 },
     };
   }
@@ -244,6 +250,10 @@ export function createGame(assets, camera, juice, audio) {
     state.tension = clamp(state.tension + (perfect ? 10 : 6), 0, 100);
     for (const p of state.players) p.squash = 0.78;
     for (const n of state.npcs) n.t = 0;
+    if (kind === "string" && !state.pickups.some((p) => p.kind === "spareGuitar")) {
+      const spawn = venue().pickups.find((p) => p.kind === "spareGuitar");
+      if (spawn) state.pickups.push(makePickup("spareGuitar", spawn.x, spawn.y));
+    }
     barkFix();
   }
 
@@ -571,7 +581,7 @@ export function createGame(assets, camera, juice, audio) {
     }
     const step = state.tutorial.step;
     if (step === "move") {
-      const a = axis("p1");
+      const a = axis(state.players[0].id);
       if (a.x || a.y) state.tutorial.dist += 70 * dt;
       if (state.tutorial.dist > 14) setTutorial("cableShow");
     } else if (step === "cableShow") {
@@ -643,6 +653,24 @@ export function createGame(assets, camera, juice, audio) {
     audio.tick();
     if (tap("mute")) audio.toggleMute();
     if (state.phase === "title") {
+      const pointer = getPointer();
+      if (pointer.clicked && pointer.y >= 72 && pointer.y < 86) {
+        const mapButtons = [52, 106, 160, 214];
+        for (let i = 0; i < mapButtons.length; i += 1) {
+          if (pointer.x >= mapButtons[i] && pointer.x < mapButtons[i] + 48) {
+            venueIndex = i;
+            reset();
+            state.phase = "title";
+            break;
+          }
+        }
+      }
+      if (pointer.clicked && pointer.y >= 92 && pointer.y < 106) {
+        if (pointer.x >= 108 && pointer.x < 154) playerCount = 1;
+        if (pointer.x >= 166 && pointer.x < 212) playerCount = 2;
+        state.playerCount = playerCount;
+      }
+      const clickedStart = pointer.clicked && pointer.x >= 138 && pointer.x < 182 && pointer.y >= 112 && pointer.y < 126;
       if (tap("p1l") || tap("p2l")) {
         venueIndex = (venueIndex + VENUES.length - 1) % VENUES.length;
         reset();
@@ -653,10 +681,32 @@ export function createGame(assets, camera, juice, audio) {
         reset();
         state.phase = "title";
       }
-      if (tap("start") || tap("p1use")) {
+      if (tap("start") || tap("p1use") || clickedStart) {
         reset();
         state.phase = "play";
         audio.start();
+      }
+      return;
+    }
+
+    if (tap("menu")) {
+      state.confirmExit = !state.confirmExit;
+      return;
+    }
+    if (state.confirmExit) {
+      const pointer = getPointer();
+      if (tap("p1l") || tap("p2l")) state.confirmChoice = 0;
+      if (tap("p1r") || tap("p2r")) state.confirmChoice = 1;
+      const clickedNo = pointer.clicked && pointer.x >= 102 && pointer.x < 150 && pointer.y >= 104 && pointer.y < 120;
+      const clickedTitle = pointer.clicked && pointer.x >= 170 && pointer.x < 218 && pointer.y >= 104 && pointer.y < 120;
+      if (clickedNo) state.confirmExit = false;
+      if (clickedTitle || ((tap("p1use") || tap("p2use")) && state.confirmChoice === 1)) {
+        audio.setRhythmMode(false);
+        audio.stop();
+        reset();
+        state.phase = "title";
+      } else if ((tap("p1use") || tap("p2use")) && state.confirmChoice === 0) {
+        state.confirmExit = false;
       }
       return;
     }
@@ -688,6 +738,14 @@ export function createGame(assets, camera, juice, audio) {
     if (state.drumGame) {
       updateDrumGame(state.drumGame, audio, dt);
       if (state.drumGame.finished) {
+        if (!state.drumGame.result?.ok) {
+          state.drumGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.setRhythmMode(false);
+          audio.stop();
+          return;
+        }
         const perfect = !!state.drumGame.result?.perfect;
         state.drumGame = null;
         clearAccident("stick", perfect);
@@ -706,6 +764,13 @@ export function createGame(assets, camera, juice, audio) {
     if (state.stringGame) {
       updateStringGame(state.stringGame, audio, dt);
       if (state.stringGame.finished) {
+        if (!state.stringGame.result?.ok) {
+          state.stringGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.stop();
+          return;
+        }
         const perfect = !!state.stringGame.result?.perfect;
         state.stringGame = null;
         clearAccident("string", perfect);
@@ -723,6 +788,13 @@ export function createGame(assets, camera, juice, audio) {
     if (state.micGame) {
       updateMicGame(state.micGame, audio, dt);
       if (state.micGame.finished) {
+        if (!state.micGame.result?.ok) {
+          state.micGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.stop();
+          return;
+        }
         const perfect = !!state.micGame.result?.perfect;
         const carrier = state.players.find((player) => player.carrying?.kind === "mic");
         if (carrier) {
@@ -748,6 +820,13 @@ export function createGame(assets, camera, juice, audio) {
     if (state.wireGame) {
       updateWireGame(state.wireGame, audio, dt);
       if (state.wireGame.finished) {
+        if (!state.wireGame.result?.ok) {
+          state.wireGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.stop();
+          return;
+        }
         const perfect = !!state.wireGame.result?.perfect;
         state.wireGame = null;
         clearAccident("cable", perfect);
@@ -762,8 +841,7 @@ export function createGame(assets, camera, juice, audio) {
       return;
     }
 
-    updatePlayer(state.players[0], "p1", dt);
-    updatePlayer(state.players[1], "p2", dt);
+    for (const player of state.players) updatePlayer(player, player.id, dt);
     updatePickups(dt);
     updateAccidents(dt);
     if (state.phase !== "play") return;
@@ -1279,29 +1357,47 @@ export function createGame(assets, camera, juice, audio) {
       const mm = String(Math.floor(t / 60));
       const ss = String(t % 60).padStart(2, "0");
       blitStr(ctx, `${mm}:${ss}`, 148, 6, "WHITE");
+      const fanWidth = Math.round(48 * clamp(state.tension / 100, 0, 1));
+      const fanKey = state.tension <= 25 ? "DANGER_RED" : state.tension <= 50 ? "DANGER_ORANGE" : "SUCCESS_GOLD";
+      blitStr(ctx, "FANS", 6, 5, "WHITE");
+      fill(ctx, "BG_SHADOW", 25, 5, 52, 7);
+      fill(ctx, "METAL_DK", 27, 7, 48, 3);
+      if (fanWidth > 0) fill(ctx, fanKey, 27, 7, fanWidth, 3);
+      blitStr(ctx, String(Math.round(state.tension)), 80, 5, fanKey);
     }
 
     const target = tutorialTarget();
     drawTutorialRoute(ctx, target);
     if (target) drawArrow(ctx, target.x, target.y);
     drawNeededItemArrows(ctx);
-    const p1 = state.players[0];
-    const hit = nearestInteract(p1);
-    const canUse = hit || (p1.carrying && p1.carrying.kind === "mic" && state.accidents.feedback.on);
+    const primary = state.players[0];
+    const hit = nearestInteract(primary);
+    const canUse = hit || (primary.carrying && primary.carrying.kind === "mic" && state.accidents.feedback.on);
     if (canUse && state.phase === "play") {
-      blitStr(ctx, "E", p1.x + 4, p1.y - 8, "SUCCESS_GOLD");
+      blitStr(ctx, primary.id === "p2" ? "ENT" : "E", primary.x + 2, primary.y - 8, "SUCCESS_GOLD");
     }
 
     if (state.phase === "title") {
-      fill(ctx, "BG_SHADOW", 70, 56, 180, 52);
-      blitStr(ctx, "LAST SONG!", 116, 62, "SUCCESS_GOLD");
-      const nm = venue().name;
-      blitStr(ctx, nm, 160 - nm.length * 2, 74, "WHITE");
+      fill(ctx, "BG_SHADOW", 36, 40, 248, 96);
+      blitStr(ctx, "LAST SONG!", 116, 46, "SUCCESS_GOLD");
+      const mapButtons = [52, 106, 160, 214];
       for (let i = 0; i < VENUES.length; i += 1) {
-        const key = i === venueIndex ? "SUCCESS_GOLD" : "METAL";
-        fill(ctx, key, 148 + i * 8, 86, 4, 4);
+        const selected = i === venueIndex;
+        const x = mapButtons[i];
+        fill(ctx, selected ? "SUCCESS_GOLD" : "METAL_DK", x, 72, 48, 14);
+        fill(ctx, selected ? "BG_NIGHT" : "METAL", x + 2, 74, 44, 10);
+        const name = VENUES[i].name;
+        blitStr(ctx, name, x + 24 - Math.floor(measureStr(name) / 2), 76, selected ? "SUCCESS_GOLD" : "WHITE");
       }
-      fill(ctx, "TENSION_PINK", 156, 96, 8, 2);
+      for (const option of [{ count: 1, x: 108 }, { count: 2, x: 166 }]) {
+        const selected = playerCount === option.count;
+        fill(ctx, selected ? "SUCCESS_GOLD" : "METAL_DK", option.x, 92, 46, 14);
+        fill(ctx, selected ? "BG_NIGHT" : "METAL", option.x + 2, 94, 42, 10);
+        blitStr(ctx, `${option.count} PLAYER`, option.x + 5, 96, selected ? "SUCCESS_GOLD" : "WHITE");
+      }
+      fill(ctx, "TENSION_PINK", 138, 112, 44, 14);
+      fill(ctx, "BG_NIGHT", 140, 114, 40, 10);
+      blitStr(ctx, "START", 150, 116, "WHITE");
     }
     if (state.phase === "win") {
       fill(ctx, "BG_SHADOW", 90, 70, 140, 32);
@@ -1314,6 +1410,7 @@ export function createGame(assets, camera, juice, audio) {
         string: ["GUITAR TROUBLE", "Replace the guitar in time!"],
         stick: ["DRUM STICK LOST", "Return the drum stick in time!"],
         feedback: ["MIC FEEDBACK", "Move the mic away in time!"],
+        minigame: ["TOO SLOW", "Finish the repair in time!"],
       };
       const reason = reasons[state.loseReason] || ["SHOW FAILED", "Try again!"];
       fill(ctx, "BG_SHADOW", 38, 56, 244, 68);
@@ -1323,6 +1420,31 @@ export function createGame(assets, camera, juice, audio) {
       blitStr(ctx, reason[1], 160 - Math.floor(measureStr(reason[1]) / 2), 92, "WHITE");
       const retry = "R - RETRY";
       blitStr(ctx, retry, 160 - Math.floor(measureStr(retry) / 2), 108, "SUCCESS_GOLD");
+    }
+  }
+
+  function drawMiniTimer(ctx) {
+    const mini = state.drumGame || state.stringGame || state.micGame || state.wireGame;
+    if (!mini || typeof mini.time !== "number") return;
+    const ratio = clamp(mini.time / mini.maxTime, 0, 1);
+    const key = ratio <= 0.25 ? "DANGER_RED" : "DANGER_ORANGE";
+    fill(ctx, "BG_SHADOW", 126, 5, 68, 9);
+    fill(ctx, "METAL_DK", 128, 7, 48, 5);
+    const width = Math.round(46 * ratio);
+    if (width > 0) fill(ctx, key, 129, 8, width, 3);
+    blitStr(ctx, String(Math.max(0, Math.ceil(mini.time))), 180, 7, key);
+  }
+
+  function drawExitConfirm(ctx) {
+    if (!state.confirmExit) return;
+    fill(ctx, "BG_SHADOW", 64, 58, 192, 72);
+    fill(ctx, "BG_NIGHT", 68, 62, 184, 64);
+    blitStr(ctx, "BACK TO TITLE?", 128, 74, "WHITE");
+    for (const option of [{ choice: 0, x: 102, label: "NO" }, { choice: 1, x: 170, label: "TITLE" }]) {
+      const selected = state.confirmChoice === option.choice;
+      fill(ctx, selected ? "SUCCESS_GOLD" : "METAL_DK", option.x, 104, 48, 16);
+      fill(ctx, "BG_NIGHT", option.x + 2, 106, 44, 12);
+      blitStr(ctx, option.label, option.x + 24 - Math.floor(measureStr(option.label) / 2), 109, selected ? "SUCCESS_GOLD" : "WHITE");
     }
   }
 
@@ -1337,7 +1459,9 @@ export function createGame(assets, camera, juice, audio) {
     if (state.stringGame) drawStringGame(ctx, state.stringGame, fill, blitStr);
     if (state.micGame) drawMicGame(ctx, state.micGame, fill, blitStr);
     if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
+    drawMiniTimer(ctx);
     drawMiniTransition(ctx);
+    drawExitConfirm(ctx);
   }
 
   return { update, draw, reset, getState: () => state };
