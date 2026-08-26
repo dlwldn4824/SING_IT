@@ -6,7 +6,7 @@ const MAP = {
   KeyE: "p1use", KeyQ: "p1drop",
   ArrowUp: "p2u", ArrowLeft: "p2l", ArrowDown: "p2d", ArrowRight: "p2r",
   Enter: "p2use", ShiftLeft: "p2drop", ShiftRight: "p2drop",
-  Space: "start", KeyR: "restart", KeyM: "mute",
+  Space: "start", KeyR: "restart", KeyM: "mute", Escape: "menu",
 };
 
 window.addEventListener("keydown", (e) => {
