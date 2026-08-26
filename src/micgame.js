@@ -15,16 +15,19 @@ function inRect(pointer, x, y, w, h) {
 }
 
 export function startMicGame() {
+  const position = 1;
+  let safePosition = position;
+  while (safePosition === position) safePosition = Math.floor(Math.random() * (MAX + 1));
   return {
-    position: 1,
-    safePosition: 6,
+    position,
+    safePosition,
     mistakes: 0,
     flash: 0,
     bounce: 0,
     finished: false,
     result: null,
-    time: 8,
-    maxTime: 8,
+    time: 3,
+    maxTime: 3,
   };
 }
 
