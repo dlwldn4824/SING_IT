@@ -77,6 +77,10 @@ function carryOffset(pl) {
 
 export function createGame(assets, camera, juice, audio) {
   const { chars, tiles, props, fx, crowd } = assets;
+  const guitarist = document.getElementById("guitarist-image");
+  const vocalist = document.getElementById("vocalist-image");
+  const drummer = document.getElementById("drummer-image");
+  const drummerPanic = document.getElementById("drummer-panic-image");
 
   const solids = [];
   const stations = {
@@ -1069,6 +1073,18 @@ export function createGame(assets, camera, juice, audio) {
     ctx.drawImage(props, sx, sy, sw, sh, Math.round(x), Math.round(y), sw, sh);
   }
 
+  function drawGuitarist(ctx, x, y) {
+    ctx.drawImage(guitarist, Math.round(x - 10), Math.round(y - 12), 36, 36);
+  }
+
+  function drawVocalist(ctx, x, y) {
+    ctx.drawImage(vocalist, Math.round(x - 10), Math.round(y - 10), 40, 30);
+  }
+
+  function drawDrummer(ctx, x, y, panic) {
+    ctx.drawImage(panic ? drummerPanic : drummer, Math.round(x - 17), Math.round(y - 13), 50, 47);
+  }
+
   function stageTile(v, x, y) {
     if (v.id === "club" || v.id === "arena") return ((x + y) / 16) % 2 === 0 ? [32, 16] : [48, 16];
     if (v.id === "fest") return ((x + y) / 16) % 2 === 0 ? [32, 0] : [16, 0];
@@ -1201,7 +1217,10 @@ export function createGame(assets, camera, juice, audio) {
       list.push({
         z: n.y,
         draw: () => {
-          drawChar(ctx, n.who, "down", frame, n.x, n.y, 1);
+          if (n.who === "guitar") drawGuitarist(ctx, n.x, n.y);
+          else if (n.who === "vocal") drawVocalist(ctx, n.x, n.y);
+          else if (n.who === "drum") drawDrummer(ctx, n.x, n.y, n.panic);
+          else drawChar(ctx, n.who, "down", frame, n.x, n.y, 1);
           if (n.panic && (n.who === "vocal" || n.who === "guitar" || n.who === "drum")) {
             fill(ctx, "WHITE", n.x + 14, n.y + 2, 1, 2);
             fill(ctx, "PEDAL_BLUE", n.x + 14, n.y + 4, 1, 1);

@@ -90,6 +90,10 @@ canvas {
   color: #9a9692;
 }
 
+.member-source {
+  display: none;
+}
+
 body.is-playing .band,
 body.is-playing .hint {
   display: none;
