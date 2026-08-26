@@ -54,4 +54,6 @@
 
 GitHub Contributors에 보이는 `cursoragent` 표시는 과거 자동화 계정 집계로 남은 오류이며, 현재 게임에 반영된 Cursor 작업물은 제거했다. 이후 변경과 검증 흐름은 Codex 작업 기준으로 관리한다.
 
+화면 캡처와 변경 기록은 [`docs/DEVELOPMENT_CAPTURE.md`](docs/DEVELOPMENT_CAPTURE.md)에 정리했다.
+
 Unity 이식은 `GAME_SPEC.md` Phase 1부터. 한 번에 전체 게임을 만들지 않는다.

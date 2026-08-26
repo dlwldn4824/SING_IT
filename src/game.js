@@ -1,7 +1,7 @@
 import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
 import { axis, tap, held, getPointer } from "./input.js";
-import { VENUES } from "./venues.js?v=player-worker-80";
+import { VENUES } from "./venues.js?v=worker-side-fix-7ee8336";
 import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
 import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
 import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
