@@ -99,6 +99,7 @@ def crew_cmap(who):
             "C": "BLACK",
             "B": "WHITE",
             "K": "METAL_DK",
+            "M": "METAL",
             "R": "SUCCESS_GOLD",
             "r": "GUITAR_SUN",
             ".": 0,
@@ -118,6 +119,7 @@ def crew_cmap(who):
         "C": "BLACK",
         "R": "SUCCESS_GOLD",
         "r": "GUITAR_SUN",
+        "M": "METAL",
         ".": 0,
     }
 
@@ -150,9 +152,9 @@ def npc_cmap(who):
         base["t"] = "SHIRT_P1_DK"
         base["H"] = "SHIRT_P1_DK"
     elif who == "flex":
-        base["T"] = "SHIRT_P2"
-        base["t"] = "SHIRT_P2_DK"
-        base["H"] = "BLACK"
+        base["T"] = "BG_RAIL"
+        base["t"] = "METAL_DK"
+        base["H"] = "HAIR_P2"
     else:
         base["T"] = "PEDAL_BLUE"
         base["t"] = "METAL_DK"
@@ -239,7 +241,7 @@ def paint_role(who, rows, view, panic=False, act=False):
             rows[0] = "..H..HH..HW....."
         if panic and view == "side":
             rows[0] = ".H..HHHW........"
-    elif who == "guitar":
+    elif who in ("guitar", "drum"):
         if view == "down":
             rows[0] = "....C.C.C......."
             rows[1] = "...CHHHHHC......"
@@ -272,13 +274,19 @@ def paint_role(who, rows, view, panic=False, act=False):
             rows[0] = "..H.H..H.HW....."
         if panic and view == "side":
             rows[0] = "H.H.HHHW........"
-    elif who == "drum":
-        if view == "down":
-            rows[14] = "....TTTTTT......"
-            rows[15] = "....LLLLLL......"
-            rows[16] = "....LL..LL......"
-            rows[17] = "....FFFFFF......"
-            rows[18] = "................"
+        if who == "drum":
+            if view == "down":
+                rows[14] = "....TTTTTT......"
+                rows[15] = "....LLLLLL......"
+                rows[16] = "....LL..LL......"
+                rows[17] = "....FFFFFF......"
+                rows[18] = "................"
+            elif view == "side":
+                rows[14] = "...TTTTTT......."
+                rows[15] = "...LLLLLL......."
+                rows[16] = "...LL..LL......."
+                rows[17] = "...FFFFFF......."
+                rows[18] = "................"
     elif who == "flex":
         if view == "down":
             rows[0] = "....CCCCCC......"
@@ -310,12 +318,6 @@ def paint_role(who, rows, view, panic=False, act=False):
             rows[7] = "..CHSSHHC......."
             rows[8] = "...CHssHC......."
             rows[9] = "....CVVC........"
-        elif view == "side":
-            rows[14] = "...TTTTTT......."
-            rows[15] = "...LLLLLL......."
-            rows[16] = "...LL..LL......."
-            rows[17] = "...FFFFFF......."
-            rows[18] = "................"
     return rows
 
 

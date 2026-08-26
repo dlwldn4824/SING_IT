@@ -288,13 +288,8 @@ export function bandConfig() {
 }
 
 export async function setupBand(assets, originals) {
-  adopt(loadSaved());
-  try {
-    const res = await fetch("assets/band/looks.json", { cache: "no-store" });
-    if (res.ok) adopt({ ...looks, ...(await res.json()) });
-  } catch {
-    /* optional file */
-  }
+  for (const key of Object.keys(looks)) delete looks[key];
+  looks.flexRole = "bass";
   rebuild(assets, originals);
 
   const root = document.getElementById("band");
