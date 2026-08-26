@@ -6,6 +6,7 @@ import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
 import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
 import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
 import { startWireGame, updateWireGame, drawWireGame } from "./wiregame.js";
+import { startAmpGame, updateAmpGame, drawAmpGame } from "./ampgame.js";
 import { bandConfig } from "./band.js";
 
 const SHOW = 180;
@@ -23,13 +24,14 @@ const ACCIDENT_RULES = {
   string: { ttl: 12, drain: 2.7 },
   stick: { ttl: 11, drain: 2.0 },
   feedback: { ttl: 8, drain: 3.6 },
+  overheat: { ttl: 9, drain: 3.0 },
 };
 const STICK_SPAWNS = [
   { x: 48, y: 122 }, { x: 168, y: 122 }, { x: 272, y: 122 },
 ];
 
 function shuffledAccidents() {
-  const order = ["cable", "stick", "string", "feedback"];
+  const order = ["cable", "stick", "string", "feedback", "overheat"];
   for (let i = order.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
@@ -134,6 +136,7 @@ export function createGame(assets, camera, juice, audio) {
         string: { on: false, ttl: 0 },
         stick: { on: false, ttl: 0 },
         feedback: { on: false, ttl: 0 },
+        overheat: { on: false, ttl: 0 },
       },
       nextSpawn: v.firstSpawn,
       spawnOrder: shuffledAccidents(),
@@ -144,6 +147,7 @@ export function createGame(assets, camera, juice, audio) {
       stringGame: null,
       micGame: null,
       wireGame: null,
+      ampGame: null,
       miniFlash: 0,
       wave: 0,
       hold: null,
@@ -182,6 +186,7 @@ export function createGame(assets, camera, juice, audio) {
       string: ["엇!", "아", "야!"],
       stick: ["야!", "ㅋㅋ", "엇!"],
       feedback: ["헉", "아아", "야!"],
+      overheat: ["아!", "헉", "야!"],
     };
     const on = Object.values(state.accidents).filter((a) => a.on).length;
     const text = on >= 2 ? pick(["ㅋㅋㅋ", "야야", "헉"]) : pick(lines[kind] || ["야!"]);
@@ -196,12 +201,13 @@ export function createGame(assets, camera, juice, audio) {
   function spawnAccident(kind) {
     const acc = state.accidents[kind];
     if (acc.on) return false;
+    if ((kind === "overheat" && state.accidents.cable.on) || (kind === "cable" && state.accidents.overheat.on)) return false;
     acc.on = true;
     acc.ttl = ACCIDENT_RULES[kind].ttl;
     juice.spark(160, 90);
     camera.shake(1, 0.16);
     audio.blip("danger");
-    if (kind === "cable" || kind === "string") audio.setStem("guitar", false);
+    if (kind === "cable" || kind === "string" || kind === "overheat") audio.setStem("guitar", false);
     if (kind === "stick") audio.setStem("drums", false);
     if (kind === "feedback") audio.setStem("vocals", false);
 
@@ -238,7 +244,7 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function accidentPos(kind) {
-    if (kind === "cable") return { x: stations.amp.x + 4, y: stations.amp.y - 8 };
+    if (kind === "cable" || kind === "overheat") return { x: stations.amp.x + 4, y: stations.amp.y - 8 };
     if (kind === "string") return { x: state.npcs[1].x + 4, y: state.npcs[1].y - 10 };
     if (kind === "stick") return { x: state.npcs[2].x + 4, y: state.npcs[2].y - 10 };
     return { x: state.npcs[0].x + 4, y: state.npcs[0].y - 10 };
@@ -297,6 +303,8 @@ export function createGame(assets, camera, juice, audio) {
       );
       if (player.carrying.kind === "stick" && dD < reach) return { type: "giveStick" };
     }
+    const ampD = dist(cx, cy, stations.amp.x + 8, stations.amp.y + 8);
+    if (state.accidents.overheat.on && ampD < 28) return { type: "coolAmp" };
     return best;
   }
 
@@ -312,6 +320,14 @@ export function createGame(assets, camera, juice, audio) {
     }
     const hit = nearestInteract(player);
     if (!hit) return;
+    if (hit.type === "coolAmp" && state.accidents.overheat.on && !state.ampGame) {
+      player.act = 0.2;
+      barkAt(stations.amp.x + 8, stations.amp.y - 4, pick(["헉", "엇!", "야!"]));
+      juice.spark(stations.amp.x + 8, stations.amp.y);
+      state.ampGame = startAmpGame();
+      state.miniFlash = 0.14;
+      return;
+    }
     if (hit.type === "pickup") {
       if (player.carrying) drop(player, 0, 0);
       player.carrying = hit.item;
@@ -496,7 +512,8 @@ export function createGame(assets, camera, juice, audio) {
       const a = state.accidents[k];
       if (!a.on) continue;
       active += 1;
-      a.ttl -= dt;
+      const pauseCableDeadline = state.tutorial.on && k === "cable";
+      if (!pauseCableDeadline) a.ttl -= dt;
       if (a.ttl <= 0) {
         a.ttl = 0;
         state.loseReason = k;
@@ -510,9 +527,11 @@ export function createGame(assets, camera, juice, audio) {
       }
       if (k === "cable" && Math.random() < 0.05) juice.spark(156, 114);
       if (k === "cable" && Math.random() < 0.08) juice.smoke(156, 112);
+      if (k === "overheat" && Math.random() < 0.12) juice.spark(stations.amp.x + 8, stations.amp.y + 2);
+      if (k === "overheat" && Math.random() < 0.16) juice.smoke(stations.amp.x + 8, stations.amp.y - 2);
     }
 
-    const guitarHurt = state.accidents.cable.on || state.accidents.string.on;
+    const guitarHurt = state.accidents.cable.on || state.accidents.string.on || state.accidents.overheat.on;
     const drumHurt = state.accidents.stick.on;
     const vocalHurt = state.accidents.feedback.on || state.pickups.some((p) => p.kind === "mic" && p.heldBy);
     audio.setStem("guitar", !guitarHurt);
@@ -540,17 +559,26 @@ export function createGame(assets, camera, juice, audio) {
     if (!state.tutorial.on) state.nextSpawn -= dt;
     if (!state.tutorial.on && state.nextSpawn <= 0) {
       const ordered = state.spawnOrder[state.spawnIndex];
+      let spawned = false;
       if (state.spawnIndex < state.spawnOrder.length) {
-        spawnAccident(ordered);
-        state.spawnIndex += 1;
+        spawned = spawnAccident(ordered);
+        if (spawned) state.spawnIndex += 1;
       } else {
-        const pool = names.filter((k) => !state.accidents[k].on);
-        if (pool.length) spawnAccident(pool[Math.floor(Math.random() * pool.length)]);
+        const pool = names.filter((k) => {
+          if (state.accidents[k].on) return false;
+          if (k === "overheat" && state.accidents.cable.on) return false;
+          if (k === "cable" && state.accidents.overheat.on) return false;
+          return true;
+        });
+        if (pool.length) spawned = spawnAccident(pool[Math.floor(Math.random() * pool.length)]);
       }
-      const gap = venue().spawnGap;
-      const randomPhase = state.spawnIndex >= state.spawnOrder.length;
-      const frequency = randomPhase ? 0.65 : 1;
-      state.nextSpawn = (gap[0] + Math.random() * (gap[1] - gap[0])) * frequency;
+      if (!spawned) state.nextSpawn = 1;
+      else {
+        const gap = venue().spawnGap;
+        const randomPhase = state.spawnIndex >= state.spawnOrder.length;
+        const frequency = randomPhase ? 0.65 : 1;
+        state.nextSpawn = (gap[0] + Math.random() * (gap[1] - gap[0])) * frequency;
+      }
     }
 
     for (const p of state.pop) p.t -= dt;
@@ -568,13 +596,16 @@ export function createGame(assets, camera, juice, audio) {
     state.tutorial.on = false;
     state.tutorial.step = "done";
     state.nextSpawn = venue().spawnGap[0] * 0.65;
-    state.spawnIndex = 4;
+    state.spawnIndex = state.spawnOrder.length;
   }
 
   function skipTutorial() {
     state.tutorial.on = false;
     state.tutorial.step = "done";
     state.nextSpawn = 6;
+    if (venue().id === "school") {
+      state.spawnOrder = ["overheat", ...state.spawnOrder.filter((kind) => kind !== "overheat")];
+    }
     state.spawnIndex = 0;
   }
 
@@ -585,7 +616,9 @@ export function createGame(assets, camera, juice, audio) {
   function updateTutorial(dt) {
     if (!state.tutorial.on) return;
     state.tutorial.t += dt;
-    if (tap("start") && state.tutorial.t > 0.5) {
+    const pointer = getPointer();
+    const clickedSkip = pointer.clicked && pointer.x >= 112 && pointer.x < 208 && pointer.y >= 164 && pointer.y < 176;
+    if (clickedSkip) {
       skipTutorial();
       return;
     }
@@ -593,7 +626,12 @@ export function createGame(assets, camera, juice, audio) {
     if (step === "move") {
       const a = axis(state.players[0].id);
       if (a.x || a.y) state.tutorial.dist += 70 * dt;
-      if (state.tutorial.dist > 14) setTutorial("cableShow");
+      if (state.tutorial.dist > 14) setTutorial("overheatShow");
+    } else if (step === "overheatShow") {
+      if (!state.accidents.overheat.on) spawnAccident("overheat");
+      if (state.tutorial.t > 1.0) setTutorial("overheatFix");
+    } else if (step === "overheatFix") {
+      if (!state.accidents.overheat.on) setTutorial("cableShow");
     } else if (step === "cableShow") {
       if (!state.accidents.cable.on) spawnAccident("cable");
       if (state.tutorial.t > 1.0) setTutorial("cableGet");
@@ -630,6 +668,9 @@ export function createGame(assets, camera, juice, audio) {
   function tutorialTarget() {
     if (!state.tutorial.on) return null;
     const step = state.tutorial.step;
+    if (step === "overheatShow" || step === "overheatFix") {
+      return { x: stations.amp.x + 8, y: stations.amp.y - 10 };
+    }
     if (step === "cableShow" || step === "cableFix") {
       return { x: stations.amp.x + 8, y: stations.amp.y - 10 };
     }
@@ -831,6 +872,12 @@ export function createGame(assets, camera, juice, audio) {
       updateWireGame(state.wireGame, audio, dt);
       if (state.wireGame.finished) {
         if (!state.wireGame.result?.ok) {
+          if (state.tutorial.on && state.accidents.cable.on) {
+            state.wireGame = startWireGame();
+            state.miniFlash = 0.14;
+            state.tension = Math.max(state.tension, 45);
+            return;
+          }
           state.wireGame = null;
           state.loseReason = "minigame";
           state.phase = "lose";
@@ -840,6 +887,30 @@ export function createGame(assets, camera, juice, audio) {
         const perfect = !!state.wireGame.result?.perfect;
         state.wireGame = null;
         clearAccident("cable", perfect);
+      } else {
+        state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
+        if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
+        if (state.tension <= 0) {
+          state.phase = "lose";
+          audio.stop();
+        }
+      }
+      return;
+    }
+
+    if (state.ampGame) {
+      updateAmpGame(state.ampGame, audio, dt);
+      if (state.ampGame.finished) {
+        if (!state.ampGame.result?.ok) {
+          state.ampGame = null;
+          state.loseReason = "minigame";
+          state.phase = "lose";
+          audio.stop();
+          return;
+        }
+        const perfect = !!state.ampGame.result?.perfect;
+        state.ampGame = null;
+        clearAccident("overheat", perfect);
       } else {
         state.tension = clamp(state.tension - 1.1 * dt, 0, 100);
         if (state.tutorial.on) state.tension = Math.max(state.tension, 45);
@@ -977,6 +1048,7 @@ export function createGame(assets, camera, juice, audio) {
   function drawEntities(ctx) {
     const list = [];
     const cableOn = state.accidents.cable.on;
+    const overheatOn = state.accidents.overheat.on;
     const stringOn = state.accidents.string.on;
     const stickOn = state.accidents.stick.on && !state.drumGame;
 
@@ -985,6 +1057,11 @@ export function createGame(assets, camera, juice, audio) {
       draw: () => {
         if (cableOn) blitProp(ctx, 16, 56, 16, 16, stations.amp.x, stations.amp.y);
         else blitProp(ctx, 32, 8, 16, 16, stations.amp.x, stations.amp.y);
+        if (overheatOn) {
+          const hot = Math.floor(performance.now() / 90) % 2;
+          fill(ctx, hot ? "DANGER_RED" : "DANGER_ORANGE", stations.amp.x + 2, stations.amp.y + 2, 12, 2);
+          fill(ctx, "WHITE", stations.amp.x + 5, stations.amp.y + 3, 6, 1);
+        }
         blitProp(ctx, 144, 16, 14, 8, stations.amp.x + 28, stations.amp.y + 10);
       },
     });
@@ -1136,6 +1213,13 @@ export function createGame(assets, camera, juice, audio) {
         fill(ctx, "WHITE", mic.x, mic.y + 22 - o, 16, 1);
       }
     }
+    if (state.accidents.overheat.on) {
+      const g = accidentPos("overheat");
+      ctx.drawImage(props, 48, 24, 8, 12, g.x, g.y - 14 + Math.round(Math.sin(performance.now() / 60)), 8, 12);
+      if (Math.floor(performance.now() / 100) % 2 === 0) {
+        fill(ctx, "DANGER_ORANGE", stations.amp.x + 3, stations.amp.y - 2, 10, 1);
+      }
+    }
     if (state.hold) {
       const p = state.players.find((pl) => pl.id === state.hold.player);
       if (p) {
@@ -1151,6 +1235,7 @@ export function createGame(assets, camera, juice, audio) {
       { accident: state.accidents.string, x: state.npcs[1].x, y: state.npcs[1].y, maxTtl: 12 },
       { accident: state.accidents.stick, x: state.npcs[2].x, y: state.npcs[2].y, maxTtl: 12 },
       { accident: state.accidents.feedback, x: state.npcs[0].x, y: state.npcs[0].y, maxTtl: 9 },
+      { accident: state.accidents.overheat, x: stations.amp.x, y: stations.amp.y, maxTtl: 9 },
     ];
     for (const timer of timers) {
       if (!timer.accident.on) continue;
@@ -1376,6 +1461,18 @@ export function createGame(assets, camera, juice, audio) {
       blitStr(ctx, String(Math.round(state.tension)), 80, 5, fanKey);
     }
 
+    if (state.phase === "play" && state.tutorial.on) {
+      fill(ctx, "SUCCESS_GOLD", 112, 164, 96, 12);
+      fill(ctx, "BG_NIGHT", 114, 166, 92, 8);
+      ctx.save();
+      ctx.fillStyle = PALETTE.WHITE;
+      ctx.font = "bold 6px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText("튜토리얼 스킵", 160, 167);
+      ctx.restore();
+    }
+
     const target = tutorialTarget();
     drawTutorialRoute(ctx, target);
     if (target) drawArrow(ctx, target.x, target.y);
@@ -1420,6 +1517,7 @@ export function createGame(assets, camera, juice, audio) {
         string: ["GUITAR TROUBLE", "Replace the guitar in time!"],
         stick: ["DRUM STICK LOST", "Return the drum stick in time!"],
         feedback: ["MIC FEEDBACK", "Move the mic away in time!"],
+        overheat: ["AMP OVERHEAT", "Cool the amp in time!"],
         minigame: ["TOO SLOW", "Finish the repair in time!"],
       };
       const reason = reasons[state.loseReason] || ["SHOW FAILED", "Try again!"];
@@ -1434,7 +1532,7 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawMiniTimer(ctx) {
-    const mini = state.drumGame || state.stringGame || state.micGame || state.wireGame;
+    const mini = state.drumGame || state.stringGame || state.micGame || state.wireGame || state.ampGame;
     if (!mini || typeof mini.time !== "number") return;
     const ratio = clamp(mini.time / mini.maxTime, 0, 1);
     const key = ratio <= 0.25 ? "DANGER_RED" : "DANGER_ORANGE";
@@ -1469,6 +1567,7 @@ export function createGame(assets, camera, juice, audio) {
     if (state.stringGame) drawStringGame(ctx, state.stringGame, fill, blitStr);
     if (state.micGame) drawMicGame(ctx, state.micGame, fill, blitStr);
     if (state.wireGame) drawWireGame(ctx, state.wireGame, fill, blitStr);
+    if (state.ampGame) drawAmpGame(ctx, state.ampGame, fill, blitStr);
     drawMiniTimer(ctx);
     drawMiniTransition(ctx);
     drawExitConfirm(ctx);
