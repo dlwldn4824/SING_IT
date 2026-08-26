@@ -1,7 +1,7 @@
 import { PALETTE } from "./palette.js";
 import { W, H } from "./camera.js";
 import { axis, tap, held, getPointer } from "./input.js";
-import { VENUES } from "./venues.js?v=five-members";
+import { VENUES } from "./venues.js?v=player-worker-80";
 import { startDrumGame, updateDrumGame, drawDrumGame } from "./drumgame.js";
 import { startStringGame, updateStringGame, drawStringGame } from "./stringgame.js";
 import { startMicGame, updateMicGame, drawMicGame } from "./micgame.js";
@@ -20,6 +20,14 @@ const FRAMES = {
   panic: [11, 12],
 };
 const WHO = { p1: 0, p2: 1, vocal: 2, guitar: 3, drum: 4, flex: 5 };
+const WORKER_FRAMES = {
+  down0: { sx: 152, sy: 32, sw: 266, sh: 447 },
+  down1: { sx: 641, sy: 32, sw: 248, sh: 447 },
+  up0: { sx: 1126, sy: 32, sw: 261, sh: 447 },
+  side0: { sx: 176, sy: 519, sw: 231, sh: 460 },
+  side1: { sx: 652, sy: 519, sw: 257, sh: 459 },
+  up1: { sx: 1131, sy: 519, sw: 260, sh: 454 },
+};
 const ACCIDENT_RULES = {
   cable: { ttl: 10, drain: 2.4 },
   string: { ttl: 12, drain: 2.7 },
@@ -83,6 +91,7 @@ export function createGame(assets, camera, juice, audio) {
   const drummerPanic = document.getElementById("drummer-panic-image");
   const bassist = document.getElementById("bassist-image");
   const keyboardist = document.getElementById("keyboardist-image");
+  const playerWorkerSheet = document.getElementById("player-worker-sheet");
 
   const solids = [];
   const stations = {
@@ -1044,6 +1053,37 @@ export function createGame(assets, camera, juice, audio) {
     blit(ctx, chars, frame * 16, row * 24, 16, 24, x, y, squash);
   }
 
+  function drawWorkerPlayer(ctx, player) {
+    if (!playerWorkerSheet?.complete) {
+      drawChar(ctx, player.who, player.dir, player.frame, player.x, player.y, player.squash);
+      return;
+    }
+    const walk = player.anim === "walk";
+    const oddFrame = Math.floor(player.t) % 2;
+    let crop = walk && oddFrame ? WORKER_FRAMES.down1 : WORKER_FRAMES.down0;
+    let flip = false;
+    if (player.dir === "up") {
+      crop = walk && oddFrame ? WORKER_FRAMES.up1 : WORKER_FRAMES.up0;
+    } else if (player.dir === "left" || player.dir === "right") {
+      crop = walk && oddFrame ? WORKER_FRAMES.side1 : WORKER_FRAMES.side0;
+      flip = player.dir === "right";
+    }
+    const dw = 24;
+    const dh = 34;
+    const dx = Math.round(player.x - 4);
+    const dy = Math.round(player.y - 10 + (player.squash < 0.96 ? 1 : 0));
+    const h = Math.max(1, Math.round(dh * player.squash));
+    ctx.save();
+    if (flip) {
+      ctx.translate(dx + dw, dy + (dh - h));
+      ctx.scale(-1, 1);
+      ctx.drawImage(playerWorkerSheet, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, dw, h);
+    } else {
+      ctx.drawImage(playerWorkerSheet, crop.sx, crop.sy, crop.sw, crop.sh, dx, dy + (dh - h), dw, h);
+    }
+    ctx.restore();
+  }
+
   function hover(item, playerNear) {
     if (!playerNear) return 0;
     return (Math.floor(item.bounce) % 2);
@@ -1076,23 +1116,23 @@ export function createGame(assets, camera, juice, audio) {
   }
 
   function drawGuitarist(ctx, x, y) {
-    ctx.drawImage(guitarist, Math.round(x - 10), Math.round(y - 12), 36, 36);
+    ctx.drawImage(guitarist, Math.round(x - 8), Math.round(y - 10), 29, 29);
   }
 
   function drawVocalist(ctx, x, y) {
-    ctx.drawImage(vocalist, Math.round(x - 10), Math.round(y - 10), 40, 30);
+    ctx.drawImage(vocalist, Math.round(x - 8), Math.round(y - 8), 32, 24);
   }
 
   function drawDrummer(ctx, x, y, panic) {
-    ctx.drawImage(panic ? drummerPanic : drummer, Math.round(x - 17), Math.round(y - 13), 50, 47);
+    ctx.drawImage(panic ? drummerPanic : drummer, Math.round(x - 14), Math.round(y - 10), 40, 38);
   }
 
   function drawBassist(ctx, x, y) {
-    ctx.drawImage(bassist, Math.round(x - 10), Math.round(y - 12), 36, 36);
+    ctx.drawImage(bassist, Math.round(x - 8), Math.round(y - 10), 29, 29);
   }
 
   function drawKeyboardist(ctx, x, y) {
-    ctx.drawImage(keyboardist, Math.round(x - 14), Math.round(y - 11), 44, 40);
+    ctx.drawImage(keyboardist, Math.round(x - 11), Math.round(y - 9), 35, 32);
   }
 
   function stageTile(v, x, y) {
@@ -1255,7 +1295,8 @@ export function createGame(assets, camera, juice, audio) {
       list.push({
         z: pl.y,
         draw: () => {
-          drawChar(ctx, pl.who, pl.dir, pl.frame, pl.x, pl.y, pl.squash);
+          if (pl.who === "p1") drawWorkerPlayer(ctx, pl);
+          else drawChar(ctx, pl.who, pl.dir, pl.frame, pl.x, pl.y, pl.squash);
           if (pl.carrying) {
             const c = carryOffset(pl);
             drawCarried(ctx, pl.carrying.kind, pl.x + c.x, pl.y + c.y, pl.dir);

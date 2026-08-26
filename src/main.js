@@ -2,7 +2,7 @@ import { makeCamera } from "./camera.js";
 import { endFrame } from "./input.js";
 import { createJuice } from "./juice.js";
 import { createAudio } from "./audio.js";
-import { createGame } from "./game.js?v=five-members";
+import { createGame } from "./game.js?v=player-worker-80";
 import { copySheet, setupBand } from "./band.js";
 
 function loadImage(src) {

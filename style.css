@@ -40,8 +40,8 @@ canvas {
 }
 
 .band-member {
-  width: 48px;
-  height: 56px;
+  width: 38px;
+  height: 45px;
   object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
